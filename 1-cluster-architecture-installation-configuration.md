@@ -6,6 +6,8 @@
 ## Manage role based access control (RBAC)
 Reference: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 
+<details>
+<summary>Solution</summary>
 Role-based access (RBAC) is a method of regulating access to computer or network resources based on the roles of individual users within your organization.
 
 It allows fine grain access permissions to users, groups or service accounts within your cluster.
@@ -61,3 +63,5 @@ kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=po
 
 kubectl create rolebinding read-pods --user=tiago --role=pod-reader --namespace=development
 ```
+
+</details>

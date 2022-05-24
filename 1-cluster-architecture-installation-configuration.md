@@ -2,6 +2,8 @@
 
 ## Table of contents
 1. [Manage role based access control (RBAC)](#manage-role-based-access-control-rbac)
+1. [Bonus: How to trobleshoot permission problems](#bonus-how-to-trobleshoot-permission-problems)
+1. [Use Kubeadm to install a basic cluster](#use-kubeadm-to-install-a-basic-cluster)
 
 ## Manage role based access control (RBAC)
 Reference: 
@@ -140,7 +142,7 @@ kubectl get pods --namespace development --as=john
 ```
 </details>
 
-## Bonus: Use Kubeadm to install a basic cluster
+## Use Kubeadm to install a basic cluster
 <details>
 <summary>Solution</summary>
 

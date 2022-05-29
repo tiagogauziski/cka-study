@@ -269,9 +269,9 @@ If you want to provision a highly available Kubernetes cluster, there are few co
 The following steps are using a stacked etcd configuration, and using another instance as load balancer running NGINX
 
 This tutorial uses the following configuration:
-1x load balancer instance
-3x control plane instances
-2x worker instances
+- 1x load balancer instance
+- 3x control plane instances
+- 2x worker instances
 
 Configure the control plane and worker instances using steps from the previous tutorial:
 1. [Disable swap](#controlworker-disable-swap)
@@ -298,17 +298,17 @@ sudo vi /etc/nginx/nginx.conf
 # Set up some environment variables for the lead balancer config file:
 # The commands below is considering the control planes IP address, 
 # but it can be configured to use hostname if you have it configured on your DNS
-CONTROLLER0_IP=<controller 0 private ip>
-CONTROLLER1_IP=<controller 1 private ip>
-CONTROLLER2_IP=<controller 1 private ip>
+CONTROL_PLANE_1=<controller 1 private ip/DNS adress>
+CONTROL_PLANE_2=<controller 2 private ip/DNS adress>
+CONTROL_PLANE_3=<controller 3 private ip/DNS adress>
 
 # Create the load balancer nginx config file:
 cat << EOF | sudo tee /etc/nginx/tcpconf.d/kubernetes.conf
 stream {
     upstream kubernetes {
-        server $CONTROLLER0_IP:6443;
-        server $CONTROLLER1_IP:6443;
-        server $CONTROLLER2_IP:6443;
+        server $CONTROL_PLANE_1:6443;
+        server $CONTROL_PLANE_2:6443;
+        server $CONTROL_PLANE_3:6443;
     }
 
     server {

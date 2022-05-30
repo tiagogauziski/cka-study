@@ -365,7 +365,7 @@ Reference:
 
 For upgrading a cluster, you should use the reference material and follow the steps. 
 
-The following steps are based on a highly available cluster described on the previous objective.
+The following steps are based on a highly available cluster described on the previous objectives.
 
 ### (Control) For the first control plane upgrade
 ```bash
@@ -397,8 +397,7 @@ sudo kubeadm upgrade plan
 sudo kubeadm upgrade apply v1.23.6
 ```
 
-### (Control) Uogade `kubelet` and `kubectl`
-- Drain the node to start the upgrade of `kubelet` and `kubectl`
+### (Control) Upgrade `kubelet` and `kubectl`
 ```bash
 # replace <node-to-drain> with the name of your node you are draining
 kubectl drain <node-to-drain> --ignore-daemonsets
@@ -418,7 +417,35 @@ kubectl uncordon <node-to-drain>
 ```
 
 ### (Worker) Worker node upgrade
+```bash
+# replace x in 1.23.x-00 with the latest patch version
+sudo apt-mark unhold kubeadm && \
+sudo apt-get update && \
+sudo apt-get install -y kubeadm=1.23.6-00 && \
+sudo apt-mark hold kubeadm
 
+# verify the upgrade plan
+sudo kubeadm upgrade plan
+
+# upgrade to the selected version
+sudo kubeadm upgrade apply v1.23.6
+
+# replace <node-to-drain> with the name of your node you are draining
+kubectl drain <node-to-drain> --ignore-daemonsets
+
+# upgrade the components
+sudo apt-mark unhold kubelet kubectl && \
+sudo apt-get update && \
+sudo apt-get install -y kubelet=1.23.6-00 kubectl=1.23.6-00 && \
+sudo apt-mark hold kubelet kubectl
+
+# restart `kubelet`
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+
+# uncordon the node
+kubectl uncordon <node-to-drain>
+```
 </details>
 
 ## Implement etcd backup and restore

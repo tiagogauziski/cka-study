@@ -148,6 +148,7 @@ kubectl get pods --namespace development --as=john
 ## Use Kubeadm to install a basic cluster
 Reference:
 - https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+- https://v1-22.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd
 - https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
 - https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
 
@@ -172,7 +173,7 @@ sudo vim /etc/fstab
 ```
 
 ### (Control/Worker) Install container runtime: `containerd`
-1. Apply common settings for Kubernetes nodes on Linux
+- Apply common settings for Kubernetes nodes on Linux
 ```bash
 # Load `overlay` and `bt_netfilter` Linux modules during startup
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
@@ -195,7 +196,7 @@ EOF
 sudo sysctl --system
 ```
 
-1. Install `containerd`:
+- Install `containerd` container runtime:
 ```bash
 # Install `containerd` using package manager
 sudo apt-get update && sudo apt-get install -y containerd
@@ -357,10 +358,66 @@ Reference:
 
 ## Perform a version upgrade on a Kubernetes cluster using `kubeadm`
 Reference:
+- https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
 
 <details>
 <summary>Solution</summary>
 
+For upgrading a cluster, you should use the reference material and follow the steps. 
+
+The following steps are based on a highly available cluster described on the previous objective.
+
+### (Control) For the first control plane upgrade
+```bash
+# replace x in 1.23.x-00 with the latest patch version
+sudo apt-mark unhold kubeadm && \
+sudo apt-get update && \
+sudo apt-get install -y kubeadm=1.23.6-00 && \
+sudo apt-mark hold kubeadm
+
+# verify the upgrade plan
+sudo kubeadm upgrade plan
+
+# upgrade the node
+sudo kubeadm upgrade node
+```
+
+### (Control) For all other control plane nodes
+```bash
+# replace x in 1.23.x-00 with the latest patch version
+sudo apt-mark unhold kubeadm && \
+sudo apt-get update && \
+sudo apt-get install -y kubeadm=1.23.6-00 && \
+sudo apt-mark hold kubeadm
+
+# verify the upgrade plan
+sudo kubeadm upgrade plan
+
+# upgrade to the selected version
+sudo kubeadm upgrade apply v1.23.6
+```
+
+### (Control) Uogade `kubelet` and `kubectl`
+- Drain the node to start the upgrade of `kubelet` and `kubectl`
+```bash
+# replace <node-to-drain> with the name of your node you are draining
+kubectl drain <node-to-drain> --ignore-daemonsets
+
+# upgrade the components
+sudo apt-mark unhold kubelet kubectl && \
+sudo apt-get update && \
+sudo apt-get install -y kubelet=1.23.6-00 kubectl=1.23.6-00 && \
+sudo apt-mark hold kubelet kubectl
+
+# restart `kubelet`
+sudo systemctl daemon-reload
+sudo systemctl restart kubelet
+
+# uncordon the node
+kubectl uncordon <node-to-drain>
+```
+
+### (Worker) Worker node upgrade
 
 </details>
 

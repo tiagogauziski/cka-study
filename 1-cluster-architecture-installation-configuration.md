@@ -353,6 +353,7 @@ Use the printed commands to join any control plane or worker node into the clust
 ## Provision underlying infrastructure to deploy a Kubernetes cluster
 Reference:
 - https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+- https://v1-22.docs.kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd
 - https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
 - https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/
 
@@ -450,9 +451,65 @@ kubectl uncordon <node-to-drain>
 
 ## Implement etcd backup and restore
 Reference:
+- https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster
+- https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#restoring-an-etcd-cluster
 
 <details>
 <summary>Solution</summary>
 
+The following steps are for a stacked HA Kubernetes cluster, with stacked `etcd`. For external `etcd` setup, the commands might be different.
+
+### Implement etcd backup
+
+- To get a backup of `etcd`, you will first need to get the `etcdctl` command line client.
+
+You can get the package using:
+```bash
+sudo apt install etcd-client
+``` 
+
+- To use the `etcdctl` on your cluster, you will need to get all nodes IP addresses, as well as the path for certificates and the certificate key being used by `etcd`. 
+
+```bash
+# Get the nodes IP addresses
+kubectl get pods -n kube-system -o wide | grep etcd
+
+# Print the pod definition for `etcd`, we will need some of the parameters.
+sudo cat /etc/kubernetes/manifests/etcd.yaml
+```
+
+- To get started with `etcdctl`, we can get the list of members of the cluster:
+```bash
+# The --endpoints can be extracted from the etcd pods
+# --cacert matches the etcd pod definition --trusted-ca-file=" parameter
+# --cert matches the etcd pod definition "--cert-file=" parameter
+# --key matches the etcd pod definition "--key-file=" parameter
+
+sudo ETCDCTL_API=3 etcdctl \
+--endpoints=https://192.168.1.14:2379,https://192.168.1.17:2379,https://192.168.1.18:2379 \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+member list --write-out table
+
+# It should output something like this:
+# +------------------+---------+---------------+---------------------------+---------------------------+
+# |        ID        | STATUS  |     NAME      |        PEER ADDRS         |       CLIENT ADDRS        |
+# +------------------+---------+---------------+---------------------------+---------------------------+
+# | 5997140dfeb3820d | started |   k8s-control | https://192.168.1.14:2380 | https://192.168.1.14:2379 |
+# | 715ce16910f037a8 | started | k8s-control-2 | https://192.168.1.17:2380 | https://192.168.1.17:2379 |
+# | 8cfeffbdc61e61cb | started | k8s-control-3 | https://192.168.1.18:2380 | https://192.168.1.18:2379 |
+# +------------------+---------+---------------+---------------------------+---------------------------+
+```
+
+- To perform the backup, just change the arguments
+```bash
+sudo ETCDCTL_API=3 etcdctl \
+--endpoints=https://192.168.1.14:2379,https://192.168.1.17:2379,https://192.168.1.18:2379 \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot save ~/etcd_backup.db
+```
 
 </details>

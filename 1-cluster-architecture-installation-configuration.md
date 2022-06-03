@@ -512,4 +512,75 @@ sudo ETCDCTL_API=3 etcdctl \
 snapshot save ~/etcd_backup.db
 ```
 
+### Implement etcd restore
+When we perform etcd restore, it will create create new etcd data directories. All members should restore the same snapshot.
+
+- First, you have to copy the backup file from the node it was taken and copy on all other control plane nodes:
+```bash
+# make sure to replace the username and node names
+# copy to node 2
+scp ~/etcd_backup.db administrator@k8s-control-2:~/etcd_backup.db
+
+# copy to node 3
+scp ~/etcd_backup.db administrator@k8s-control-3:~/etcd_backup.db
+```
+
+- To perform the restore using the backup file previously created:
+```bash
+# SSH into node 1
+# Perform a restore on node 1
+sudo ETCDCTL_API=3 etcdctl \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot restore ~/etcd_backup.db \
+--name=k8s-control \
+--initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-advertise-peer-urls https://192.168.1.14:2380 \
+--data-dir=/var/lib/etcd_restore
+
+# SSH into node 2
+# Perform a restore on node 2
+sudo ETCDCTL_API=3 etcdctl \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot restore ~/etcd_backup.db \
+--name=k8s-control-2 \
+--initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-advertise-peer-urls https://192.168.1.17:2380 \
+--data-dir=/var/lib/etcd_restore
+
+# SSH into node 3
+# Perform a restore on node 3
+sudo ETCDCTL_API=3 etcdctl \
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshot restore ~/etcd_backup.db \
+--name=k8s-control-3 \
+--initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-advertise-peer-urls https://192.168.1.18:2380 \
+--data-dir=/var/lib/etcd_restore
+```
+
+- We need to stop all API Server and etcd pods to replace etcd's data directory. We will do this by removing the static pods manifest on each control plane node. This action will make kubelet stop the pods. Execute the commands on each control plane node:
+```bash
+# Create a tmp folder and move all manifests there.
+mkdir /tmp/kubernetes-manifests/
+sudo mv /etc/kubernetes/manifests/*.yaml /tmp/kubernetes-manifests/
+```
+
+- Lets create a backup from the last etcd data directory and replace with the restored one. Execute the commands on each control plane node:
+```bash
+# Create a backup folder and lets rename the restored etcd into the /var/lib/etcd
+sudo mv /var/lib/etcd /var/lib/etcd.bak
+sudo mv /var/lib/etcd_restore /var/lib/etcd
+```
+
+- Now we move the static pods manifests back to the Kubernetes folder. Execute the commands on each control plane node:
+```bash
+# Create a tmp folder and move all manifests there.
+sudo mv /tmp/kubernetes-manifests/*.yaml /etc/kubernetes/manifests/
+```
 </details>

@@ -2,6 +2,7 @@
 
 ## Table of contents
 1. [Understand deployments and how to perform rolling upgrade and rollbacks](#understand-deployments-and-how-to-perform-rolling-upgrade-and-rollbacks)
+1. [Use ConfigMaps and Secrets to configure applications](#use-configmaps-and-secrets-to-configure-applications)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -281,4 +282,39 @@ kubectl rollout undo deployment/nginx-deployment --to-revision=2
 # Output:
 # deployment.apps/nginx-deployment rolled back
 ```
+</details>
+
+## Use ConfigMaps and Secrets to configure applications
+Reference: 
+- https://kubernetes.io/docs/concepts/configuration/configmap/
+
+<details>
+<summary>Solution</summary>
+
+The ConfigMap is an API object that lets you store configuration for other objects to use (such as Pod).  
+Unlike most Kubernetes objects that have a `spec`, a ConfigMap has `data` and `binaryData` fields.
+
+### Create a ConfigMap (sample-configmap.yaml)
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sample-configmap
+data:
+  # property-like keys; each key maps to a simple value
+  player_initial_lives: "3"
+  ui_properties_file_name: "user-interface.properties"
+
+  # file-like keys
+  game.properties: |
+    enemy.types=aliens,monsters
+    player.maximum-lives=5    
+  user-interface.properties: |
+    color.good=purple
+    color.bad=yellow
+    allow.textmode=true   
+```
+
+
 </details>

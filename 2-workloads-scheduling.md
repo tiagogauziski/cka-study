@@ -315,6 +315,84 @@ data:
     color.bad=yellow
     allow.textmode=true   
 ```
+### Consume a ConfigMap inside a Pod definition
 
+There are four different ways that we can use a ConfigMap to configure a container inside a Pod:
+1. Inside a container command and args
+1. Environment Variables for a container
+1. Add a file in a read-only volume, for a application to read
+1. Write code to run inside the Pod that uses the Kubernetes API to read a ConfigMap
 
+The fourth method means additional work to add code into the application to consume Kubernetes API, but this technique allows you it would allow you to consume ConfigMap from different namespaces.
+
+- Create a Pod and reference the ConfigMap:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-pod-configmap
+spec:
+  containers:
+    - name: demo
+      image: alpine
+      # command: ["sleep", "3600"]
+      command: ['sh', '-c', 'while true; do echo "PLAYER_INITIAL_LIVES: $PLAYER_INITIAL_LIVES"; sleep 3600; done']
+      env:
+        # Define the environment variable
+        - name: PLAYER_INITIAL_LIVES
+          valueFrom:
+            configMapKeyRef:
+              name: sample-configmap 
+              key: player_initial_lives
+        - name: UI_PROPERTIES_FILE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: sample-configmap
+              key: ui_properties_file_name
+      volumeMounts:
+      - name: config
+        mountPath: "/config"
+        readOnly: true
+  volumes:
+    # You set volumes at the Pod level, then mount them into containers inside that Pod
+    - name: config
+      configMap:
+        # Provide the name of the ConfigMap you want to mount.
+        name: sample-configmap
+        # An array of keys from the ConfigMap to create as files
+        items:
+        - key: "game.properties"
+          path: "game.properties"
+        - key: "user-interface.properties"
+          path: "user-interface.properties"
+```
+
+- Once the Pod is running, we can verify the ConfigMap usage inside it:
+```bash
+# We can check the value of the environment variable by get the logs from the Pod.
+# It should output the value for the environment variable PLAYER_INITIAL_LIVES
+kubectl logs sample-pod-configmap
+
+# Output: 
+# PLAYER_INITIAL_LIVES: 3
+
+# To verify the ConfigMap being mapped as a volume, we can open the container and 
+# run a `ls` and check it's contents
+kubectl exec sample-pod-configmap -- ls /config
+
+# Output:
+# game.properties
+# user-interface.properties
+
+kubectl exec sample-pod-configmap -- cat /config/game.properties
+
+# Output:
+# enemy.types=aliens,monsters
+# player.maximum-lives=5
+```
+
+### Create a Secret (sample-secret.yaml)
+```yaml
+
+```
 </details>

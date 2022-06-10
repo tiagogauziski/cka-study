@@ -3,6 +3,7 @@
 ## Table of contents
 1. [Understand deployments and how to perform rolling upgrade and rollbacks](#understand-deployments-and-how-to-perform-rolling-upgrade-and-rollbacks)
 1. [Use ConfigMaps and Secrets to configure applications](#use-configmaps-and-secrets-to-configure-applications)
+1. [Know how to scale applications](#know-how-to-scale-applications)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -287,6 +288,7 @@ kubectl rollout undo deployment/nginx-deployment --to-revision=2
 ## Use ConfigMaps and Secrets to configure applications
 Reference: 
 - https://kubernetes.io/docs/concepts/configuration/configmap/
+- https://kubernetes.io/docs/concepts/configuration/secret/
 
 <details>
 <summary>Solution</summary>
@@ -325,7 +327,7 @@ There are four different ways that we can use a ConfigMap to configure a contain
 
 The fourth method means additional work to add code into the application to consume Kubernetes API, but this technique allows you it would allow you to consume ConfigMap from different namespaces.
 
-- Create a Pod and reference the ConfigMap:
+- Create a Pod and reference the `ConfigMap`:
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -392,7 +394,97 @@ kubectl exec sample-pod-configmap -- cat /config/game.properties
 ```
 
 ### Create a Secret (sample-secret.yaml)
+
+Similar to `ConfigMap`, `Secret` also has two properties to store values: `data` and `stringData`. The difference is that values for `data` needs to be base64 encoded, and `stringData` accepts arbitrary strings as values. Internally, it all gets merged into `data`.
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sample-secret
+type: Opaque
+data:
+  password: $(echo -n "test" | base64 -w0)
+  username: $(echo -n "tiago" | base64 -w0)
+stringData:
+  foo: bar
+EOF
+```
+
+- You can check the `Secret` contents:
+```bash
+kubectl get secret sample-secret -o yaml
+
+# Output:
+# apiVersion: v1
+# data:
+#   foo: YmFy
+#   password: dGVzdA==
+#   username: dGlhZ28=
+# kind: Secret
+# metadata:
+# ...
+```
+
+> Note that the `stringData` key `foo` was merged into `data` and converted into base64.
+
+- Create a Pod and reference the `Secret` (sample-pod-secret.yaml):
 ```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-pod-secret
+spec:
+  containers:
+    - name: demo
+      image: alpine
+      command: ['sh', '-c', 'while true; do echo "SECRET_FOO: $SECRET_FOO"; sleep 3600; done']
+      env:
+      - name: SECRET_FOO
+        valueFrom:
+          secretKeyRef:
+            name: sample-secret
+            key: foo
+            optional: false # This means that the secret MUST exists, and include the key named `foo`
+      volumeMounts:
+      - name: secrets
+        mountPath: '/etc/secrets'
+  volumes:
+  - name: secrets
+    secret:
+      secretName: sample-secret
+```
+
+- Similar to ConfigMap, it's possible to check the Secret being used on the Pod:
+```bash
+# We can check the value of the environment variable by get the logs from the Pod.
+kubectl logs sample-pod-secret
+
+# Output: 
+# SECRET_FOO: bar
+
+# To verify the Secret being mapped as a volume, we can open the container and 
+# run a `ls` and check it's contents
+kubectl exec sample-pod-secret -- ls /etc/secrets
+
+# Output:
+# game.properties
+# user-interface.properties
+
+kubectl exec sample-pod-secret -- cat /etc/secrets/username
+
+# Output:
+# tiago
 
 ```
+</details>
+
+## Know how to scale applications
+Reference: 
+- 
+
+<details>
+<summary>Solution</summary>
+
 </details>

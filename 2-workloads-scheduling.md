@@ -4,6 +4,7 @@
 1. [Understand deployments and how to perform rolling upgrade and rollbacks](#understand-deployments-and-how-to-perform-rolling-upgrade-and-rollbacks)
 1. [Use ConfigMaps and Secrets to configure applications](#use-configmaps-and-secrets-to-configure-applications)
 1. [Know how to scale applications](#know-how-to-scale-applications)
+1. [Understand the primitives used to create robust, self-headling, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -481,6 +482,152 @@ kubectl exec sample-pod-secret -- cat /etc/secrets/username
 </details>
 
 ## Know how to scale applications
+Reference: 
+- https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#scaling-a-deployment
+- https://kubernetes.io/docs/tasks/run-application/scale-stateful-set/
+
+<details>
+<summary>Solution</summary>
+
+To scale applications in Kubernetes, you just need to define how many replicas you need, and Kubernetes does the rest for you.
+
+- You can scale it using declarative or imperative commands:
+```bash
+# Declarative scaling:
+# Update the `replicas` field with the new value
+vim nginx-deployment.yaml
+
+# Apply the changes using kubectl
+kubectl apply -f nginx-deployment.yaml
+# Output:
+# deployment.apps/nginx-deployment configured
+
+# You can also edit the deployment directly using kubectl edit
+kubectl edit deployment nginx-deployment
+# Output:
+# deployment.apps/nginx-deployment edited
+
+# Imperative scaling:
+kubectl scale deployment nginx-deployment --replicas 5
+# Output:
+# deployment.apps/nginx-deployment scaled
+```
+
+The same way we scale Deployments, it will also work for:
+- StatefulSets
+- ReplicaSets (not being controlled by a Deployment) 
+</details>
+
+## Bonus: Understanding the role of DaemonSets
+Reference: 
+- https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
+
+<details>
+<summary>Solution</summary>
+
+DaemonSet ensures that all (or some) Nodes run a copy of a Pod. As nodes are added to the cluster, Pods are added to the new nodes. When nodes are removed, the Pods are also removed.
+
+Some typical uses of a DaemonSet are:
+- Running a cluster storage daemon on every node.
+- Running a log collection daemon on every node.
+- Running a node monitoring daemon on every node.
+
+> Note that if some CNI plugins also use DaemonSets to enable networking on all nodes of the cluster.
+> If you are using the default flannel configuration, you should see a DaemonSet being used:
+> ```bash
+> kubectl get daemonset -n kube-system
+> 
+> # Output:
+> # NAME              DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+> # kube-flannel-ds   5         5         5       5            5           <none>                   29d
+> # kube-proxy        5         5         5       5            5           kubernetes.io/os=linux   29d
+> ```
+
+- Create a DaemonSet (sample-daemonset.yaml)
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-elasticsearch
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+    spec:
+      tolerations:
+      # these tolerations are to have the daemonset runnable on control plane nodes
+      # remove them if your control plane nodes should not run pods
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: fluentd-elasticsearch
+        image: quay.io/fluentd_elasticsearch/fluentd:v2.5.2
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+```
+
+- Run `kubectl create` to apply create the resource:
+```bash
+kubectl create -f sample-daemonset.yaml
+
+# Output:
+# daemonset.apps/fluentd-elasticsearch created
+
+# We can see the `fluentd-elasticsearch` DaemonSet running
+kubectl get daemonset -n kube-system
+
+# Output
+# NAME                    DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+# fluentd-elasticsearch   5         5         5       5            5           <none>                   84s
+# kube-flannel-ds         5         5         5       5            5           <none>                   29d
+# kube-proxy              5         5         5       5            5           kubernetes.io/os=linux   29d
+
+# We can also check the Pods running for each node
+kubectl get pods -n kube-system -o wide
+
+# Output:
+# NAME                                  READY   STATUS    RESTARTS       AGE     IP             NODE            NOMINATED NODE   READINESS GATES
+# ...
+# fluentd-elasticsearch-lvvt8             1/1     Running   0              2m48s   10.244.0.27    k8s-control     <none>           <none>
+# fluentd-elasticsearch-6wmtd             1/1     Running   0              2m48s   10.244.1.3     k8s-control-2   <none>           <none>
+# fluentd-elasticsearch-xd245             1/1     Running   0              2m48s   10.244.4.3     k8s-control-3   <none>           <none>
+# fluentd-elasticsearch-xs67t             1/1     Running   0              2m48s   10.244.2.51    k8s-worker1     <none>           <none>
+# fluentd-elasticsearch-hjm7g             1/1     Running   0              2m48s   10.244.3.52    k8s-worker2     <none>           <none>
+# ...
+```
+
+</details>
+
+## Understand the primitives used to create robust, self-headling, application deployments
 Reference: 
 - 
 

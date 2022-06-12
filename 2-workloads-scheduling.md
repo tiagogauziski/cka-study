@@ -4,6 +4,8 @@
 1. [Understand deployments and how to perform rolling upgrade and rollbacks](#understand-deployments-and-how-to-perform-rolling-upgrade-and-rollbacks)
 1. [Use ConfigMaps and Secrets to configure applications](#use-configmaps-and-secrets-to-configure-applications)
 1. [Know how to scale applications](#know-how-to-scale-applications)
+1. [Bonus: Understanding the role of DaemonSets](#bonus-understanding-the-role-of-daemonsets)
+1. [Bonus: Understanding the role of StatefulSets](#bonus-understanding-the-role-of-statefulsets)
 1. [Understand the primitives used to create robust, self-headling, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
@@ -624,6 +626,17 @@ kubectl get pods -n kube-system -o wide
 # fluentd-elasticsearch-hjm7g             1/1     Running   0              2m48s   10.244.3.52    k8s-worker2     <none>           <none>
 # ...
 ```
+
+</details>
+
+## Bonus: Understanding the role of StatefulSets
+Reference: 
+- https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+
+<details>
+<summary>Solution</summary>
+
+
 
 </details>
 

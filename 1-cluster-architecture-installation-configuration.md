@@ -536,6 +536,7 @@ sudo ETCDCTL_API=3 etcdctl \
 snapshot restore ~/etcd_backup.db \
 --name=k8s-control \
 --initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-cluster-token etcd-cluster-140622 \
 --initial-advertise-peer-urls https://192.168.1.14:2380 \
 --data-dir=/var/lib/etcd_restore
 
@@ -548,6 +549,7 @@ sudo ETCDCTL_API=3 etcdctl \
 snapshot restore ~/etcd_backup.db \
 --name=k8s-control-2 \
 --initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-cluster-token etcd-cluster-140622 \
 --initial-advertise-peer-urls https://192.168.1.17:2380 \
 --data-dir=/var/lib/etcd_restore
 
@@ -560,6 +562,7 @@ sudo ETCDCTL_API=3 etcdctl \
 snapshot restore ~/etcd_backup.db \
 --name=k8s-control-3 \
 --initial-cluster k8s-control=https://192.168.1.14:2380,k8s-control-2=https://192.168.1.17:2380,k8s-control-3=https://192.168.1.18:2380 \
+--initial-cluster-token etcd-cluster-140622 \
 --initial-advertise-peer-urls https://192.168.1.18:2380 \
 --data-dir=/var/lib/etcd_restore
 ```

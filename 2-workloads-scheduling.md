@@ -632,10 +632,107 @@ kubectl get pods -n kube-system -o wide
 ## Bonus: Understanding the role of StatefulSets
 Reference: 
 - https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
+- https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/
 
 <details>
 <summary>Solution</summary>
 
+StatefulSets are useful to be able to scale stateful applications. 
+
+> StatefulSets require a Headless Service to be responsible for the network identity of the Pods. The service needs to be created beforehand.
+
+- Create a StatefulSet (sample-statefulset.yaml)
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: statefulset-pv-1
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/pv-1"
+  persistentVolumeReclaimPolicy: Recycle
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: statefulset-pv-2
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/pv-2"
+  persistentVolumeReclaimPolicy: Recycle
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: statefulset-pv-3
+spec:
+  capacity:
+    storage: 100Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/pv-3"
+  persistentVolumeReclaimPolicy: Recycle
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  labels:
+    app: statefulset-service
+spec:
+  ports:
+  - port: 80
+    name: web
+  clusterIP: None
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sample-statefulset
+  labels:
+    app: statefulset
+spec:
+  replicas: 3
+  serviceName: nginx-service
+  selector:
+    matchLabels:
+      app: nginx
+  minReadySeconds: 10
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+          name: web
+        volumeMounts:
+        - name: www
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: www
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Mi
+```
 
 
 </details>

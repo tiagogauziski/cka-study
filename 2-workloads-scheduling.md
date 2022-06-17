@@ -6,7 +6,7 @@
 1. [Know how to scale applications](#know-how-to-scale-applications)
 1. [Bonus: Understanding the role of DaemonSets](#bonus-understanding-the-role-of-daemonsets)
 1. [Bonus: Understanding the role of StatefulSets](#bonus-understanding-the-role-of-statefulsets)
-1. [Understand the primitives used to create robust, self-headling, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
+1. [Understand the primitives used to create robust, self-healing, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -734,12 +734,51 @@ spec:
           storage: 100Mi
 ```
 
+> The manifest above define 3 PersistentVolumes manually because our cluster is not configured to use dynamic provisioning. 
+> Because the the StatefulSet define a `volumeClaimTemplate`, it requires a PersistentVolume to exist, otherwise it won't create the Pods.
+
+- We can check the Kubernetes resources created as part of the StatefulSet
+```bash
+# Notice the Pod names are created have a ordinal index (1, 2, 3, N)
+kubectl get pods
+
+# Output:
+# NAME                   READY   STATUS    RESTARTS   AGE
+# sample-statefulset-0   1/1     Running   0          112s
+# sample-statefulset-1   1/1     Running   0          98s
+# sample-statefulset-2   1/1     Running   0          78s
+
+# Each Pod also created it's own PersistentVolumeClaim
+kubectl get pvc
+
+# Output
+# NAME                       STATUS   VOLUME             CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# www-sample-statefulset-0   Bound    statefulset-pv-1   100Mi      RWO                           20h
+# www-sample-statefulset-1   Bound    statefulset-pv-3   100Mi      RWO                           20h
+# www-sample-statefulset-2   Bound    statefulset-pv-2   100Mi      RWO                           20h
+```
+
+- StatefulSet also creates stable network identifiers
+```bash
+# Lets run a busybox container and run nslookup to check the DNS entries available
+kubectl run -i --tty --image busybox:1.28 dns-test --restart=Never --rm
+
+# Output:
+#  # nslookup nginx-service
+# Server:    10.96.0.10
+# Address 1: 10.96.0.10 kube-dns.kube-system.svc.cluster.local
+# 
+# Name:      nginx-service
+# Address 1: 10.244.2.59 sample-statefulset-1.nginx-service.default.svc.cluster.local
+# Address 2: 10.244.3.68 sample-statefulset-0.nginx-service.default.svc.cluster.local
+# Address 3: 10.244.3.69 sample-statefulset-2.nginx-service.default.svc.cluster.local
+```
 
 </details>
 
-## Understand the primitives used to create robust, self-headling, application deployments
+## Understand the primitives used to create robust, self-healing, application deployments
 Reference: 
-- 
+- https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
 
 <details>
 <summary>Solution</summary>

@@ -779,8 +779,71 @@ kubectl run -i --tty --image busybox:1.28 dns-test --restart=Never --rm
 ## Understand the primitives used to create robust, self-healing, application deployments
 Reference: 
 - https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
+- https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 
 <details>
 <summary>Solution</summary>
+
+Once you create a Deployment, StatefulSet or a DaemonSet, you want to make sure the Pods are resiliant in case of a failure on the application on other downstream components.
+
+Pods allow us to define probes on running containers to assess their health:
+- `livenessProbe`
+Liveness probes allow you to customise the default detection mechanism and make it more sophisticated.    
+By default, Kubernetes will only consider a container to "down" and apply the restart policy if the container process stops.
+> By default, Kubernetes will decide whether to restart the container based on the status of container's PID 1 process.
+> The first process to run on a container assumes PID 1. 
+
+- `readinessProbe`
+Indicates whether the container is ready to respond to requests. If the readiness probe fails, the Endpoint controller (related to Services) removes the Pod's IP address from the endpoints of all Services that match the Pod.
+The default state of readiness before the initial delay is `Failure`. If a container does not provide a readiness probe, the default state is `Success`.
+
+- `startupProbe`
+Indicates whether the aplication within the container is started. All other probes are disabled if a startup probe is provided, until it succeeds. If the startup probe fails, the kubelet kill the container, and the container is subjected to it's restart policy. 
+> Similar to `lievenessProbe`, however, while liveness probe run constantly, startup probes run at the container startup and stop running once it succeed. 
+> Useful for legacy applications with long startup times.
+
+### Investigate the default `livenessProbe` behavior
+
+We can investigate the default liveness probe behavior by running a default nginx container, verify who is PID 1, kill the process and check what happens.
+
+- Create a nginx Pod
+```bash
+# Lets use an imperative command to create the Pod
+kubectl run nginx --image=nginx
+
+# Check the Pod has been created
+kubectl get pods
+
+# Output:
+# NAME    READY   STATUS    RESTARTS   AGE
+# nginx   1/1     Running   0          31s
+
+# Note the RESTARTS is set to 0.
+
+# Lets run a bash command inside the container.
+kubectl exec nginx -i -t -- bash
+
+# List all process
+ls -l /proc/*/exe
+
+# Output:
+# [...]
+# lrwxrwxrwx 1 root  root  0 Jun 18 05:35 /proc/1/exe -> /usr/sbin/nginx
+# lrwxrwxrwx 1 nginx nginx 0 Jun 18 05:35 /proc/31/exe
+# [...]
+
+# Let's kill the process and check what happens
+kill 1
+
+# Output:
+# root@nginx:/# command terminated with exit code 137
+
+# Check again the Pod list
+kubectl get pods
+
+# Output:
+# NAME    READY   STATUS    RESTARTS     AGE
+# nginx   1/1     Running   1 (4s ago)   8m12s
+```
 
 </details>

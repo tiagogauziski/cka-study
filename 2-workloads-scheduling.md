@@ -810,8 +810,10 @@ We can investigate the default liveness probe behavior by running a default ngin
 ```bash
 # Lets use an imperative command to create the Pod
 kubectl run nginx --image=nginx
+```
 
-# Check the Pod has been created
+- Check the Pod has been created
+```bash
 kubectl get pods
 
 # Output:
@@ -819,8 +821,10 @@ kubectl get pods
 # nginx   1/1     Running   0          31s
 
 # Note the RESTARTS is set to 0.
+```
 
-# Lets run a bash command inside the container.
+- Lets run a bash command inside the container.
+```bash
 kubectl exec nginx -i -t -- bash
 
 # List all process
@@ -837,13 +841,141 @@ kill 1
 
 # Output:
 # root@nginx:/# command terminated with exit code 137
+```
 
-# Check again the Pod list
+- Check again the Pod list
+```bash
 kubectl get pods
 
 # Output:
 # NAME    READY   STATUS    RESTARTS     AGE
 # nginx   1/1     Running   1 (4s ago)   8m12s
 ```
+
+### Configure a `livenessProbe` with `exec` command
+
+- Create a Pod with a `livenessProbe` (sample-pod-livenessprobe.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: liveness
+  name: sample-pod-livenessprobe
+spec:
+  containers:
+  - name: liveness
+    image: k8s.gcr.io/busybox
+    args:
+    - /bin/sh
+    - -c
+    - touch /tmp/healthy; sleep 30; rm -f /tmp/healthy; sleep 600
+    livenessProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      initialDelaySeconds: 5
+      periodSeconds: 5
+```
+
+The definition above describes a Pod that creates a file located at `/tmp/healthy` and sleeps for 30 seconds. After that, it removes the file and sleeps for 10 minutes.  
+Because the `livenessProbe` has been configured to run `cat /tmp/healthy`, after 30 seconds, the file will be deleted and the probe should fail, because the file does not exits anymore.
+
+- Within 35 seconds, we can check the Pod events, the probe has not failed yet:
+```bash
+kubectl describe pod sample-pod-livenessprobe
+
+# Output:
+# Events:
+#   Type    Reason     Age   From               Message
+#    ----    ------     ----  ----               -------
+#   Normal  Scheduled  8s    default-scheduler  Successfully assigned default/sample-pod-livenessprobe to k8s-worker2
+#   Normal  Pulling    7s    kubelet            Pulling image "k8s.gcr.io/busybox"
+#   Normal  Pulled     5s    kubelet            Successfully pulled image "k8s.gcr.io/busybox" in 1.99976877s
+#   Normal  Created    5s    kubelet            Created container liveness
+#   Normal  Started    5s    kubelet            Started container liveness
+```
+
+- After 35 seconds, we should be able to see 
+```bash
+
+# Output:
+# Events:
+#   Type     Reason     Age                From               Message
+#   ----     ------     ----               ----               -------
+#   Normal   Scheduled  76s                default-scheduler  Successfully assigned default/sample-pod-livenessprobe to k8s-worker2
+#   Normal   Pulled     73s                kubelet            Successfully pulled image "k8s.gcr.io/busybox" in 1.99976877s
+#   Normal   Created    73s                kubelet            Created container liveness
+#   Normal   Started    73s                kubelet            Started container liveness
+#   Warning  Unhealthy  31s (x3 over 41s)  kubelet            Liveness probe failed: cat: can't open '/tmp/healthy': No such file or directory
+#   Normal   Killing    31s                kubelet            Container liveness failed liveness probe, will be restarted
+#   Normal   Pulling    1s (x2 over 75s)   kubelet            Pulling image "k8s.gcr.io/busybox"
+```
+
+> Note that the `livenessProbe` execute 3x before killing the container. That is because the default `failureThreshold` value is 3. [Source](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes)
+
+### Configure a `startupProbe` with `exec` command
+
+- Create a Pod with a `startupProbe` (sample-pod-startupprobe.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: startupprobe
+  name: sample-pod-startupprobe
+spec:
+  containers:
+  - name: startup
+    image: k8s.gcr.io/busybox
+    args:
+    - /bin/sh
+    - -c
+    - touch /tmp/healthy; sleep 30; rm -f /tmp/healthy; sleep 600
+    livenessProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      periodSeconds: 10
+    startupProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      failureThreshold: 30
+      periodSeconds: 10
+```
+
+Similar to the previous `livenessProbe` example, when using `startupProbe`, it allows slow applications to startup with different timeout/threshold requirements than the `livenessProbe`. Once `startupProbe` succeeds, `livenessProbe` takes over.
+
+### Configure a `readinessProbe` with `exec` command
+
+- Create a Pod with a `readinessProbe` (sample-pod-readinessProbe.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: readinessProbe
+  name: sample-pod-readinessProbe
+spec:
+  containers:
+  - name: startup
+    image: k8s.gcr.io/busybox
+    args:
+    - /bin/sh
+    - -c
+    - sleep 30; touch /tmp/healthy; sleep 1200
+    readinessProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      periodSeconds: 10
+```
+`readinessProbe` runs in parallel with `livenessProbe` during the entire lifecycle of the container.  
+Main goal for `readinessProbe` is to ensure that traffic does not reach the container that is not ready for it. 
 
 </details>

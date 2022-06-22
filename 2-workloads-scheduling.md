@@ -7,6 +7,7 @@
 1. [Bonus: Understanding the role of DaemonSets](#bonus-understanding-the-role-of-daemonsets)
 1. [Bonus: Understanding the role of StatefulSets](#bonus-understanding-the-role-of-statefulsets)
 1. [Understand the primitives used to create robust, self-healing, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
+1. [Understand how resource limits can affect Pod scheduling](#understand-how-resource-limits-can-affect-pod-scheduling)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -787,7 +788,7 @@ Reference:
 Once you create a Deployment, StatefulSet or a DaemonSet, you want to make sure the Pods are resiliant in case of a failure on the application on other downstream components.
 
 Pods allow us to define probes on running containers to assess their health:
-- `livenessProbe`
+- `livenessProbe`  
 Liveness probes allow you to customise the default detection mechanism and make it more sophisticated.    
 By default, Kubernetes will only consider a container to "down" and apply the restart policy if the container process stops.
 > By default, Kubernetes will decide whether to restart the container based on the status of container's PID 1 process.  
@@ -836,6 +837,7 @@ ls -l /proc/*/exe
 # lrwxrwxrwx 1 nginx nginx 0 Jun 18 05:35 /proc/31/exe
 # [...]
 
+# Notice that nginx process is PID 1
 # Let's kill the process and check what happens
 kill 1
 
@@ -977,5 +979,29 @@ spec:
 ```
 `readinessProbe` runs in parallel with `livenessProbe` during the entire lifecycle of the container.  
 Main goal for `readinessProbe` is to ensure that traffic does not reach the container that is not ready for it. 
+
+</details>
+
+## Understand how resource limits can affect Pod scheduling
+Reference: 
+- https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+- https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/
+- https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/
+
+
+<details>
+<summary>Solution</summary>
+
+When creating a Pod, you can optionally specify how much of each resource a container needs.
+
+There are two ways to specify resource usage:
+- `request`
+The `request` is used when the scheduler is deciding which Node the Pod should be allocated. If all available Nodes does not have enough resources (less than requested), the Pod does not get allocated, and remain with `Pending` status.  
+The Pod is allowed to use more resources than initially requested, except when the `limit` is provided. 
+- `limit`
+When a `limit` is specified, the kubelet enforces those limits so that the running container is not alloed to use more of that resource than the limit set.  
+Limits can be implemented either reactively (the sistem intervenes once it sees a violation) or by enforcement (the system prevents the container from ever exceeding the limit). Different runtimes can have different ways to implement the same restrictions. 
+
+### Specify a CPU request
 
 </details>

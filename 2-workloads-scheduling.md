@@ -68,7 +68,7 @@ kubectl get replicaset
 # nginx-deployment-9456bbbf9   3         3         3       2m6s
 ```
 
-> Notice that the name of the ReplicaSet is always formatted as `[DeploymentName]-[Random-String]`. The random string is randomly generated and uses the `pod-template-hash` as seed.
+> Note that the name of the ReplicaSet is always formatted as `[DeploymentName]-[Random-String]`. The random string is randomly generated and uses the `pod-template-hash` as seed.
 > ```bash
 > kubectl get pods --show-labels
 > 
@@ -124,7 +124,7 @@ kubectl get rs
 # nginx-deployment-9456bbbf9   0         0         0       18h
 # nginx-deployment-ff6655784   3         3         3       20s
 
-# Notice the ReplicaSet random string into the Pods name.
+# Note the ReplicaSet random string into the Pods name.
 kubectl get pods
 
 # Output:
@@ -232,7 +232,7 @@ kubectl rollout history deployment/nginx-deployment --revision=2
 
 - Suppose that you made a typo while updating the Deployment:
 ```bash
-# Notice the version is incorrect.
+# Note the version is incorrect.
 kubectl set image deployment/nginx-deployment nginx=nginx:1.161 --record
 ```
 
@@ -254,7 +254,7 @@ kubectl get rs
 # nginx-deployment-9456bbbf9    0         0         0       19h
 # nginx-deployment-ff6655784    3         3         3       56m
 
-# We can check the Pods. Notice the STATUS of the Pods
+# We can check the Pods. Note the STATUS of the Pods
 kubectl get pods
 
 # Output
@@ -740,7 +740,7 @@ spec:
 
 - We can check the Kubernetes resources created as part of the StatefulSet
 ```bash
-# Notice the Pod names are created have a ordinal index (1, 2, 3, N)
+# Note the Pod names are created have a ordinal index (1, 2, 3, N)
 kubectl get pods
 
 # Output:
@@ -837,7 +837,7 @@ ls -l /proc/*/exe
 # lrwxrwxrwx 1 nginx nginx 0 Jun 18 05:35 /proc/31/exe
 # [...]
 
-# Notice that nginx process is PID 1
+# Note that nginx process is PID 1
 # Let's kill the process and check what happens
 kill 1
 

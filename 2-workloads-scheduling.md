@@ -8,6 +8,7 @@
 1. [Bonus: Understanding the role of StatefulSets](#bonus-understanding-the-role-of-statefulsets)
 1. [Understand the primitives used to create robust, self-healing, application deployments](#understand-the-primitives-used-to-create-robust-self-headling-application-deployments)
 1. [Understand how resource limits can affect Pod scheduling](#understand-how-resource-limits-can-affect-pod-scheduling)
+1. [Awareness of manifest management and common templating tools](#awareness-of-manifest-management-and-common-templating-tools)
 
 ## Understand deployments and how to perform rolling upgrade and rollbacks
 Reference: 
@@ -999,9 +1000,96 @@ There are two ways to specify resource usage:
 The `request` is used when the scheduler is deciding which Node the Pod should be allocated. If all available Nodes does not have enough resources (less than requested), the Pod does not get allocated, and remain with `Pending` status.  
 The Pod is allowed to use more resources than initially requested, except when the `limit` is provided. 
 - `limit`
-When a `limit` is specified, the kubelet enforces those limits so that the running container is not alloed to use more of that resource than the limit set.  
+When a `limit` is specified, the kubelet enforces those limits so that the running container is not allowed to use more of that resource than the limit set.  
 Limits can be implemented either reactively (the sistem intervenes once it sees a violation) or by enforcement (the system prevents the container from ever exceeding the limit). Different runtimes can have different ways to implement the same restrictions. 
 
-### Specify a CPU request
+### Specify a Pod `request` and `limit`
+
+**Prerequisite**: To be able to perform the next steps, you need to have [metrics-server](https://github.com/kubernetes-sigs/metrics-server) enabled on your cluster.
+
+- Create a Pod with a CPU `request` and `limit` (sample-pod-cpurequestlimit.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-pod-cpurequestlimit
+spec:
+  containers:
+  - name: cpu-demo-ctr
+    image: vish/stress
+    resources:
+      limits:
+        cpu: "1"
+      requests:
+        cpu: "0.5"
+    args:
+    - -cpus
+    - "2"
+```
+
+Because we are requesting 0.5, the Pod was able to be scheduled for execution.
+The Pod has a `limit` of 1 CPU, and it's trying to use 2 CPUs.
+
+- Let's check the how much CPU the Pod is using:
+```bash
+kubectl top pod
+
+# Output
+# NAME                    CPU(cores)   MEMORY(bytes)
+# sample-pod-cpurequest   999m         1Mi
+```
+
+> Note that the container CPU is being throttled, because the container is attempting to use more CPU resources than it's limit.
+
+### Specify a Pod container `request` bigger than any available Node
+
+- Create a Pod with a CPU `request` bigger than the available Nodes:. (sample-pod-cpurequestlarge.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-pod-cpurequestlarge
+spec:
+  containers:
+  - name: cpu-demo-ctr
+    image: vish/stress
+    resources:
+      requests:
+        cpu: "100"
+    args:
+    - -cpus
+    - "2"
+```
+
+- Lets get the Pod status:
+```bash
+kubectl get pods
+
+# Note the STATUS=Pending
+# Output:
+# NAME                         READY   STATUS    RESTARTS   AGE
+# sample-pod-cpurequestlarge   0/1     Pending   0          15s
+```
+
+- We can get more details using `kubectl describe pod`:
+```bash
+kubectl describe pod sample-pod-cpurequestlarge
+
+# Output:
+# ...
+# Events:
+#   Type     Reason            Age   From               Message
+#   ----     ------            ----  ----               -------
+#   Warning  FailedScheduling  24s   default-scheduler  0/5 nodes are available: 2 Insufficient cpu, 3 node(s) had taint {node-role.kubernetes.io/master: }, that the pod didn't tolerate.
+```
+</details>
+
+## Awareness of manifest management and common templating tools
+Reference: 
+- 
+
+<details>
+<summary>Solution</summary>
+
 
 </details>

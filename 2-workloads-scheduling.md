@@ -1086,10 +1086,410 @@ kubectl describe pod sample-pod-cpurequestlarge
 
 ## Awareness of manifest management and common templating tools
 Reference: 
-- 
+- https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/
+- https://kubernetes.io/docs/concepts/overview/working-with-objects/object-management/
 
 <details>
 <summary>Solution</summary>
 
+### Kustomize - Declarative management of Kubernetes Obects
 
+Kustomize is a tool for customizing Kubernetes configurations. It has the following features to manage application configuration files:
+- generating resources from other sources 
+- setting cross-cutting fields for resources
+- composing and customizing collections of resources
+
+#### Generating `ConfigMap` using `configMapGenerator`
+
+`ConfigMap` and `Secret` hold configuration or sensitive data that are used by other Kubernetes objects, such as Pods. Usually the source of the configurations are external to a cluster, such as a `.properties` or a `.config` file. Kustomize has a `secretGenerator` and `configMapGenerator`, which generate Secret and ConfigMap from files or literals.
+
+- Create a `ConfigMap` using `configMapGenerator`  
+
+To generate a `ConfigMap` from a file, add an entry to the `files` list in `configMapGenerator`.
+
+```bash
+# Create a application.properties file
+cat <<EOF >application.properties
+FOO=Bar
+EOF
+
+cat <<EOF >./kustomization.yaml
+configMapGenerator:
+- name: example-configmap-1
+  files:
+  - application.properties
+EOF
+```
+
+- Generate a `ConfigMap` by running the following `kubectl` command:
+```bash
+kubectl kustomize ./
+```
+
+- The generated ConfigMap is:
+```yaml
+apiVersion: v1
+data:
+  application.properties: |
+    FOO=Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-1-g4hk9g2ff8
+```
+
+- It's also possible to generate a `ConfigMap` from an `.env` file. 
+
+> Setting values from the environment may be useful when they cannot easily be predicted, such as a git SHA.
+
+```bash
+# Create a .env file
+# BAZ will be populated from the local environment variable $BAZ
+cat <<EOF >.env
+FOO=Bar
+BAZ
+EOF
+
+cat <<EOF >./kustomization.yaml
+configMapGenerator:
+- name: example-configmap-1
+  envs:
+  - .env
+EOF
+```
+
+- Generate the `ConfigMap`
+```bash
+BAZ=Qux kubectl kustomize ./
+```
+
+- The generated `ConfigMap` is:
+```yaml
+apiVersion: v1
+data:
+  BAZ: Qux
+  FOO: Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-1-892ghb99c8
+```
+
+- `ConfigMap` can also be generated from list of literal key-value pairs
+```bash
+cat << EOF > kustomization.yaml
+configMapGenerator:
+- name: example-configmap-2
+  literals:
+  - FOO=Bar
+EOF
+```
+
+- The generated `ConfigMap` is:
+```yaml
+apiVersion: v1
+data:
+  FOO: Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-2-42cfbf598f
+```
+
+- To use a generated `ConfigMap` in a `Deployment`, you can reference it by the name of the configMapGenerator. Kustomize will automatically replace this name with the generated name.
+```bash
+# Create a application.properties file
+cat <<EOF >application.properties
+FOO=Bar
+EOF
+
+cat <<EOF >deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: app
+        image: my-app
+        volumeMounts:
+        - name: config
+          mountPath: /config
+      volumes:
+      - name: config
+        configMap:
+          name: example-configmap-1
+EOF
+
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+configMapGenerator:
+- name: example-configmap-1
+  files:
+  - application.properties
+EOF
+```
+
+- Generate the `ConfigMap` and `Deployment`:
+```bash
+kubectl kustomize ./
+```
+
+- The generated `Deployment` will refer to the generated `ConfigMap` by name:
+```yaml
+apiVersion: v1
+data:
+  application.properties: |
+    FOO=Bar
+kind: ConfigMap
+metadata:
+  name: example-configmap-1-g4hk9g2ff8
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: my-app
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: my-app
+        name: app
+        volumeMounts:
+        - mountPath: /config
+          name: config
+      volumes:
+      - configMap:
+          name: example-configmap-1-g4hk9g2ff8
+        name: config
+```
+
+#### Generating `Secret` using `secretGenerator`
+
+Similar to the way we generate `ConfigMap` we can also generate `Secret` objects using `secretGenerator`.  
+
+- Create a `Secret` using `secretGenerator` from a file:
+```bash
+# Create a password.txt file
+cat <<EOF >./password.txt
+username=admin
+password=secret
+EOF
+
+cat <<EOF >./kustomization.yaml
+secretGenerator:
+- name: example-secret-1
+  files:
+  - password.txt
+EOF
+```
+
+- The generated `Secret` is as follows:
+```yaml
+apiVersion: v1
+data:
+  password.txt: dXNlcm5hbWU9YWRtaW4KcGFzc3dvcmQ9c2VjcmV0Cg==
+kind: Secret
+metadata:
+  name: example-secret-1-2kdd8ckcc7
+type: Opaque
+```
+
+- It can also be generated from a list of key-value literals:
+```bash
+cat <<EOF >./kustomization.yaml
+secretGenerator:
+- name: example-secret-2
+  literals:
+  - username=admin
+  - password=secret
+EOF
+```
+
+- The generated output is:
+```yaml
+apiVersion: v1
+data:
+  password: c2VjcmV0
+  username: YWRtaW4=
+kind: Secret
+metadata:
+  name: example-secret-2-8c5228dkb9
+type: Opaque
+```
+
+- Like `ConfigMap`, generated `Secret` can be used in `Deployments`:
+```bash
+# Create a password.txt file
+cat <<EOF >./password.txt
+username=admin
+password=secret
+EOF
+
+cat <<EOF >deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: app
+        image: my-app
+        volumeMounts:
+        - name: password
+          mountPath: /secrets
+      volumes:
+      - name: password
+        secret:
+          secretName: example-secret-1
+EOF
+
+cat <<EOF >./kustomization.yaml
+resources:
+- deployment.yaml
+secretGenerator:
+- name: example-secret-1
+  files:
+  - password.txt
+EOF
+```
+
+- The output should look like:
+```yaml
+apiVersion: v1
+data:
+  password.txt: dXNlcm5hbWU9YWRtaW4KcGFzc3dvcmQ9c2VjcmV0Cg==
+kind: Secret
+metadata:
+  name: example-secret-1-2kdd8ckcc7
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: my-app
+  name: my-app
+spec:
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: my-app
+        name: app
+        volumeMounts:
+        - mountPath: /secrets
+          name: password
+      volumes:
+      - name: password
+        secret:
+          secretName: example-secret-1-2kdd8ckcc7
+```
+
+### Setting cross-cutting fields
+
+It is quite common to set cross-cutting fields for all Kubernetes resources in a project. Some use cases for setting cross-cutting fields:
+- setting the same namespace for all Resources
+- adding the same name prefix or suffix
+- adding the same set of labels
+- adding the same set of annotations
+
+Here is an example:
+```bash
+# Create a deployment.yaml
+cat <<EOF >./deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+EOF
+
+cat <<EOF >./kustomization.yaml
+namespace: my-namespace
+namePrefix: dev-
+nameSuffix: "-001"
+commonLabels:
+  app: bingo
+  tier: backend
+commonAnnotations:
+  oncallPager: 800-555-1212
+resources:
+- deployment.yaml
+EOF
+```
+
+- The output will look like:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    oncallPager: 800-555-1212
+  labels:
+    app: bingo
+    tier: backend
+  name: dev-nginx-deployment-001
+  namespace: my-namespace
+spec:
+  selector:
+    matchLabels:
+      app: bingo
+      tier: backend
+  template:
+    metadata:
+      annotations:
+        oncallPager: 800-555-1212
+      labels:
+        app: bingo
+        tier: backend
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+```
 </details>

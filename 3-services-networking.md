@@ -3,6 +3,7 @@
 ## Table of contents
 1. [Understand host networking configuration on the cluster nodes](#understand-host-networking-configuration-on-the-cluster-nodes)
 1. [Understand connectivity between Pods](#understand-connectivity-between-pods)
+1. [Understand ClusterIP, NodePort, LoadBalancer service types and endpoints](#understand-clusterip-nodeport-loadbalancer-service-types-and-endpoints)
 
 ## Understand host networking configuration on the cluster nodes
 Reference: 
@@ -22,8 +23,6 @@ Kubernetes imposes the following fundamental requirements on any networking impl
 - agents on a node (system daemons, kubelet) can communicate with all Pods on that node.
 
 The idea of having Pods with IP address enable a low-friction porting of apps running on VMs into containers.
-
-
 
 </details>
 
@@ -52,5 +51,76 @@ spec:
       image: busybox
       command: ['sh', '-c', 'while true; do wget -O - http://localhost; sleep 10; done']
 ```
+
+</details>
+
+## Understand ClusterIP, NodePort, LoadBalancer service types and endpoints
+Reference:
+- https://kubernetes.io/docs/concepts/services-networking/service/
+
+<details>
+<summary>Solution</summary>
+
+### Create a service
+
+- Create a Pod and Service and bind them (sample-pod-service.yaml)
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  labels:
+    app.kubernetes.io/name: proxy
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+      - containerPort: 80
+        name: http-web-svc
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app.kubernetes.io/name: proxy
+  ports:
+  - name: name-of-service-port
+    protocol: TCP
+    port: 80
+    targetPort: http-web-svc
+```
+
+> Note that the `Pod` label `app.kubernetes.io/name` is used as `selector` on the `Service`.  
+> This way a `Service` knows how to redirect requests to a group of `Pods` (like a `Deployment` or `StatefulSet`)
+
+- Let's get the service details:
+```bash
+kubectl get services
+
+# Output:
+# NAME            TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+# kubernetes      ClusterIP   10.96.0.1       <none>        443/TCP    22h
+# nginx-service   ClusterIP   10.97.253.251   <none>        80/TCP     13m
+```
+
+- We can try using `curl` to hit the Pod behind the service. Use the Service CLUSTER-IP and PORT associated with the service.
+```bash
+curl 10.97.253.251:80
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+```
+
+### ClusterIP
+
+
 
 </details>

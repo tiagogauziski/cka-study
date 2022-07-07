@@ -121,6 +121,89 @@ curl 10.97.253.251:80
 
 ### ClusterIP
 
+- The default Service type.
+- Expose the service on a cluster-internal IP. 
+- Not reachable from outside the cluster.
 
+### NodePort
+
+If the you set the Service `type` field to `NodePort`, Kubernetes will allocate a port from a range specified by `--service-node-port-range` flag on `/etc/kubernetes/manifests/kube-apiserver.yaml` (default: 30000-32767). 
+
+When you create a Service as `NodePort`, the Service will report the allocated port in it's `.spec.ports[*].nodePort` field.
+Each node on the cluster proxies that port into your service. 
+
+- Create a `NodePort` Service
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-nodeport
+  labels:
+    app.kubernetes.io/name: proxy-nodeport
+spec:
+  containers:
+  - name: nginx
+    image: nginx:stable
+    ports:
+      - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: proxy-nodeport
+  ports:
+  - name: name-of-service-port
+    protocol: TCP
+    port: 8080
+    targetPort: 80
+```
+
+- Let's get the service details.
+```bash
+kubectl get services
+
+# Output
+# NAME            TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+# kubernetes      ClusterIP   10.96.0.1        <none>        443/TCP          2d22h
+# nginx-service   NodePort    10.104.240.162   <none>        8080:31451/TCP   5s
+
+# Note the nodePort is set to 31451.
+```
+
+- If we make a call to multiple nodes of the cluster on the same port, it will forward the request to the service.
+```bash
+kubectl get nodes
+
+# Output:
+# NAME          STATUS   ROLES                  AGE     VERSION
+# k8s-control   Ready    control-plane,master   2d22h   v1.23.5
+# k8s-worker1   Ready    <none>                 2d22h   v1.23.5
+# k8s-worker2   Ready    <none>                 2d22h   v1.23.5
+
+# If we curl a node:
+curl k8s-control:31451
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+
+# If we curl another node:
+curl k8s-worker1:31451
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+```
 
 </details>

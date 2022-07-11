@@ -61,9 +61,13 @@ Reference:
 <details>
 <summary>Solution</summary>
 
-### Create a service
+### CLusterIP
 
-- Create a Pod and Service and bind them (sample-pod-service.yaml)
+- The default Service type.
+- Expose the service on a cluster-internal IP. (The service will get an IP address - check it using `kubectl get services`)
+- Not reachable from outside the cluster.
+
+- Create a Pod and Service and bind them (sample-service-clusterip.yaml)
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -118,12 +122,6 @@ curl 10.97.253.251:80
 # <title>Welcome to nginx!</title>
 # ...
 ```
-
-### ClusterIP
-
-- The default Service type.
-- Expose the service on a cluster-internal IP. 
-- Not reachable from outside the cluster.
 
 ### NodePort
 
@@ -203,6 +201,57 @@ curl k8s-worker1:31451
 # <html>
 # <head>
 # <title>Welcome to nginx!</title>
+# ...
+```
+
+### LoadBalancer
+
+On a cloud provider that supports external load balancer (like AWS ELB/ALB/NLB or Azure Load Balancer/Application Gateway), the Service type `LoadBalancer` will provision a external load balancer. The creation of the external resource happens asynchronously and information about the provisioned balancer is published in the Service's `{.status.loadBalancer}` field. 
+
+### ExternalName
+
+Services of type `ExternalName` map a Service to a DNS name and does not use `selector` to redirect to a Pod. You specify these Services with `{.spec.externalName}` field.
+
+- Create a `ExternalName` service (sample-service-externalname.yaml)
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+  namespace: development
+spec:
+  type: ExternalName
+  externalName: example.com
+```
+
+- Lets check our Service
+```bash
+kubectl get service -n development
+
+# Note: no CLUSTER-IP, only EXTERNAL-IP.
+# Output:
+# NAME         TYPE           CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+# my-service   ExternalName   <none>       example.com   <none>    17m
+```
+
+- The Service will create a CNAME DNS entry to redirect to `example.com`. We can check it by making some calls from within a Pod:
+```bash
+# Lets run a Pod and open a shell so we can run some commands
+kubectl run -i --tty alpine --image=alpine --restart=Never --rm -- sh
+
+# We will need curl to run test our Service
+apk --update add curl
+
+# We then call curl to the service. 
+# Because the service will redirect to another URI, we need to add the `Host` header with the correct value. 
+# We also need to skip TLS validation (--insecure) as we are calling one URI but tempering with the Host.
+curl -H "Host: example.com" https://my-service.development.svc.cluster.local --insecure
+
+# Output
+# <!doctype html>
+# <html>
+# <head>
+#     <title>Example Domain</title>
 # ...
 ```
 

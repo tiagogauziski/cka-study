@@ -4,6 +4,7 @@
 1. [Understand host networking configuration on the cluster nodes](#understand-host-networking-configuration-on-the-cluster-nodes)
 1. [Understand connectivity between Pods](#understand-connectivity-between-pods)
 1. [Understand ClusterIP, NodePort, LoadBalancer service types and endpoints](#understand-clusterip-nodeport-loadbalancer-service-types-and-endpoints)
+1. [Know how to use Ingress controllers and Ingress resources](#know-how-to-use-ingress-controllers-and-ingress-resources)
 
 ## Understand host networking configuration on the cluster nodes
 Reference: 
@@ -254,5 +255,87 @@ curl -H "Host: example.com" https://my-service.development.svc.cluster.local --i
 #     <title>Example Domain</title>
 # ...
 ```
+
+### Service without `selector` and Endpoints
+
+Services most commonly abstract access to Pod thanks to the `selector`, but when used with Endpoints object without a selector, the Service can abstract other kinds of backends, including the ones that run outside the cluster. For example:
+- You want to have an external database in production, but in your test environment your have your own StatefulSet
+- You are migrating a workload to Kubernetes. While evaluating the approach, you run only a portion of your backends in Kubernetes.
+
+For any of these scenarios, you can use a Service **without** a selector.
+
+> **Note**  
+> The endpoint IPs must not be: loopback (127.0.0.0/8 for IPv4, ::1/128 for IPv6), or link-local (169.254.0.0/16 and 224.0.0.0/24 for IPv4, fe80::/64 for IPv6).
+> Endpoint IP addresses cannot be the cluster IPs or other Kubernetes Services.
+
+- For this example, we are going to point to a Pod IP address. 
+```bash
+kubectl get pods -o wide
+
+# Example
+# NAME             READY   STATUS    RESTARTS     AGE     IP           NODE          NOMINATED NODE   READINESS GATES
+# nginx-nodeport   1/1     Running   1 (3d ago)   6d23h   10.244.1.6   k8s-worker1   <none>           <none>
+```
+
+- Create a Service without a selector and the corresponding Endpoint
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-service-without-selector
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  # the name here should match the name of the Service
+  name: sample-service-without-selector
+subsets:
+  - addresses:
+      - ip: 10.244.1.6 # You cannot use the cluster IP address instead of any Kubernetes internal cluster IP .
+    ports:
+      - port: 80
+```
+
+- Check to see the details of the service created:
+```bash
+kubectl get services
+
+# Output:
+# kubectl get services
+# NAME                              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+# kubernetes                        ClusterIP   10.96.0.1        <none>        443/TCP          9d
+# nginx-service                     NodePort    10.104.240.162   <none>        8080:31451/TCP   6d23h
+# sample-service-without-selector   ClusterIP   10.102.237.244   <none>        80/TCP           2m20s
+```
+
+- We can check to see if we reach the Pod:
+```bash
+curl 10.102.237.244
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+```
+
+> **Note**  
+> If you need to point another Service within the Cluster, consider using an `ExternalName` Service type.
+> An `ExternalName` Service is a special case of Service that **does not have selectors** and uses DNS names instead. 
+
+
+</details>
+
+## Know how to use Ingress controllers and Ingress resources
+Reference:
+
+<details>
+<summary>Solution</summary>
 
 </details>

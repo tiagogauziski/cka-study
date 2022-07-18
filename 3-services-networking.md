@@ -334,8 +334,208 @@ curl 10.102.237.244
 
 ## Know how to use Ingress controllers and Ingress resources
 Reference:
+- https://kubernetes.io/docs/concepts/services-networking/ingress/
 
 <details>
 <summary>Solution</summary>
+
+Ingress is a Kubernetes object to help with load balancing, SSL termination and name-based virtual hosting.
+
+An IngressController is reponsible for fulfilling the Ingress, usually with a load balancer.
+
+An Ingress does not expose arbitrary ports or protocols. Exposing services other than HTTP and HTTPS to the internet typically uses a Service of `type=NodePort` or `type=LoadBalancer`
+
+### Install IngressController - NGINX IngressController
+
+- Install the NGINX ingress controller using the following YAML definition:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.3.0/deploy/static/provider/cloud/deploy.yaml
+```
+
+- Get the installed IngressClass:
+```bash
+kubectl get ingressclass
+
+# Output:
+# NAME    CONTROLLER             PARAMETERS   AGE
+# nginx   k8s.io/ingress-nginx   <none>       2d7h
+```
+
+
+### Create an Ingress resource
+
+- Create a Namespace to hold all resources:
+```bash
+kubectl create namespace sample-ingress
+```
+
+- Create an Ingress:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-deployment
+  namespace: sample-ingress
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello-app
+  template:
+    metadata:
+      labels:
+        app: hello-app
+    spec:
+      containers:
+      - name: hello-app
+        image: nginx
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-service
+  namespace: sample-ingress
+spec:
+  type: ClusterIP
+  selector:
+    app: hello-app
+  ports:
+  - name: service-http
+    protocol: TCP
+    port: 80
+    targetPort: http # you can name the port that matches the Pod or use the port number (80)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sample-ingress
+  namespace: sample-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /hello-app
+        pathType: Prefix
+        backend:
+          service:
+            name: ingress-service
+            port:
+              number: 80
+```
+
+- The definition will create few resources:
+ - Deployment with a NGINX image running on port 80
+ - Service to expose the NGINX Pods internally (`type=ClusterIP`)
+ - Ingress resource to redirect external calls from `<EXTERNAL>/hello-app` to the Service
+
+- Let's check the if the Ingress is working as expected:
+```bash
+kubectl get all -n sample-ingress
+
+# Output:
+# kubectl get all -n sample-ingress
+# NAME                                      READY   STATUS    RESTARTS   AGE
+# pod/ingress-deployment-6c77df49d9-4t9ln   1/1     Running   0          10m
+# pod/ingress-deployment-6c77df49d9-5k42c   1/1     Running   0          10m
+# 
+# NAME                      TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+# service/ingress-service   ClusterIP   10.104.153.192   <none>        80/TCP    21m
+# 
+# NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+# deployment.apps/ingress-deployment   2/2     2            2           20m
+# 
+# NAME                                            DESIRED   CURRENT   READY   AGE
+# replicaset.apps/ingress-deployment-6c77df49d9   2         2         2       10m
+```
+
+- Lets have a look at the Ingress created:
+```bash
+kubectl describe ingress sample-ingress -n sample-ingress
+
+# Output: 
+# Name:             sample-ingress
+# Labels:           <none>
+# Namespace:        sample-ingress
+# Address:
+# Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+# Rules:
+#   Host        Path  Backends
+#   ----        ----  --------
+#   *
+#               /hello-app   ingress-service:80 (10.244.1.11:80,10.244.2.32:80)
+# Annotations:  nginx.ingress.kubernetes.io/rewrite-target: /
+# Events:
+#   Type    Reason  Age                From                      Message
+#   ----    ------  ----               ----                      -------
+#   Normal  Sync    23m (x2 over 23m)  nginx-ingress-controller  Scheduled for sync# 
+```
+
+- Because we are not running on a cloud provider, we don't have a LoadBalancer created. We need to get the IngressController service IP address:
+```bash
+kubectl get all -n ingress-nginx
+
+# Output:
+# NAME                                            READY   STATUS    RESTARTS       AGE
+# pod/ingress-nginx-controller-54d587fbc6-fn484   1/1     Running   1 (108m ago)   2d8h
+# 
+# NAME                                         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+# service/ingress-nginx-controller             LoadBalancer   10.109.12.86     <pending>     80:32284/TCP,443:31392/TCP   2d8h
+# service/ingress-nginx-controller-admission   ClusterIP      10.101.107.213   <none>        443/TCP                      2d8h
+# 
+# NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE
+# deployment.apps/ingress-nginx-controller   1/1     1            1           2d8h
+# 
+# NAME                                                  DESIRED   CURRENT   READY   AGE
+# replicaset.apps/ingress-nginx-controller-54d587fbc6   1         1         1       2d8h
+```
+
+> **Note**  
+> The Service `ingress-nginx-controller` does not have a EXTERNAL-IP.  
+> We can use the NodePorts to make requests to the IngressController:
+> - HTTP: 80:**32284**/TCP
+> - HTTPS: 443:**31392**/TCP
+
+- If we make calls to the ports described, we should be able to reach the Pods:
+```bash
+# HTTPS request
+curl https://localhost:31392/hello-app --insecure
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+
+# HTTP request
+curl http://localhost:32284/hello-app
+
+# Output:
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+```
+
+- If we try to use URI prefix that does not exist, the IngressController returns a HTTP 404:
+```bash
+curl http://localhost:32284/invalid
+
+# Output:
+# <html>
+# <head><title>404 Not Found</title></head>
+# <body>
+# <center><h1>404 Not Found</h1></center>
+# <hr><center>nginx</center>
+# </body>
+# </html>
+```
 
 </details>

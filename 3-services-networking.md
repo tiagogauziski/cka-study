@@ -430,9 +430,9 @@ spec:
 ```
 
 - The definition will create few resources:
- - Deployment with a NGINX image running on port 80
- - Service to expose the NGINX Pods internally (`type=ClusterIP`)
- - Ingress resource to redirect external calls from `<EXTERNAL>/hello-app` to the Service
+  - Deployment with a NGINX image running on port 80
+  - Service to expose the NGINX Pods internally (`type=ClusterIP`)
+  - Ingress resource to redirect external calls from `<EXTERNAL>/hello-app` to the Service
 
 - Let's check the if the Ingress is working as expected:
 ```bash

@@ -538,4 +538,150 @@ curl http://localhost:32284/invalid
 # </html>
 ```
 
+### Name based virtual hosting
+
+Name-based virtual hosts support routing HTTP traffic to multiple host names at the same IP address.
+
+We can achieve that by specifying a `{.spec.rules[].host}` on a Ingress.
+
+- Lets start by creating a namespace for our resources
+```bash
+kubectl create namespace ingress-host-routing
+```
+
+- Create an Ingress: (ingress-host-routing.yaml)
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: first-deployment
+  namespace: ingress-host-routing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: first
+  template:
+    metadata:
+      labels:
+        app: first
+    spec:
+      containers:
+      - name: nginx
+        image: nginxdemos/hello
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: first-service
+  namespace: ingress-host-routing
+spec:
+  type: ClusterIP
+  selector:
+    app: first
+  ports:
+  - name: first-service-http
+    protocol: TCP
+    port: 80
+    targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: second-deployment
+  namespace: ingress-host-routing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: second
+  template:
+    metadata:
+      labels:
+        app: second
+    spec:
+      containers:
+      - name: nginx
+        image: nginxdemos/hello
+        ports:
+        - containerPort: 80
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: second-service
+  namespace: ingress-host-routing
+spec:
+  type: ClusterIP
+  selector:
+    app: second
+  ports:
+  - name: second-service-http
+    protocol: TCP
+    port: 80
+    targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-host-routing-ingress
+  namespace: ingress-host-routing
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: first.127.0.0.1.nip.io # using the master node ip address and a DNS resolution workaround to get to it
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: first-service
+            port:
+              number: 80
+  - host: second.127.0.0.1.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: second-service
+            port:
+              number: 80
+```
+
+- The above definition create multiple resources:
+  - A Deployment and Service to route requests from `first.127.0.0.1.nip.io` host
+  - A Deployment and Service to route requests from `second.127.0.0.1.nip.io` host
+  - A Ingress resource to map all the hosts and configure the IngressController to route to the correct services based on the host name.
+    
+  
+- If we call the IngressController CLUSTER-IP:NODE-PORT we can test the newly created Ingress resource:
+```bash
+# On any node of the custer:
+curl http://first.127.0.0.1.nip.io:32284/
+
+# Output:
+# ...
+# <p><span>Server&nbsp;address:</span> <span>10.244.1.15:80</span></p>
+# <p><span>Server&nbsp;name:</span> <span>first-deployment-684495f4d8-dwbpk</span></p>
+# ...
+
+# If we call the second:
+curl http://second.127.0.0.1.nip.io:32284/
+
+# Output
+# ...
+# <p><span>Server&nbsp;address:</span> <span>10.244.2.37:80</span></p>
+# <p><span>Server&nbsp;name:</span> <span>second-deployment-5fbb848954-xsvll</span></p>
+# ...
+```
+
 </details>

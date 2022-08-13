@@ -328,8 +328,6 @@ curl 10.102.237.244
 > **Note**  
 > If you need to point another Service within the Cluster, consider using an `ExternalName` Service type.
 > An `ExternalName` Service is a special case of Service that **does not have selectors** and uses DNS names instead. 
-
-
 </details>
 
 ## Know how to use Ingress controllers and Ingress resources
@@ -683,5 +681,15 @@ curl http://second.127.0.0.1.nip.io:32284/
 # <p><span>Server&nbsp;name:</span> <span>second-deployment-5fbb848954-xsvll</span></p>
 # ...
 ```
+
+</details>
+
+## Know how to use Ingress controllers and Ingress resources
+Reference:
+- https://kubernetes.io/docs/tasks/administer-cluster/coredns/
+- https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/
+
+<details>
+<summary>Solution</summary>
 
 </details>

@@ -9,3 +9,11 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 1. [Cluster Architecture, Installation & Configuration](1-cluster-architecture-installation-configuration.md)
 1. [Workloads & Scheduling](2-workloads-scheduling.md)
 1. [Services & Networking](3-services-networking.md)
+
+
+## Helpful commands
+
+### Create a Pod to troubleshoot cluster
+```bash
+kubectl run -i --tty alpine --image=alpine --restart=Never --rm -- sh
+```

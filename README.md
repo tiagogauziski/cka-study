@@ -17,3 +17,12 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 ```bash
 kubectl run -i --tty alpine --image=alpine --restart=Never --rm -- sh
 ```
+
+## .vimrc (~/.vimrc)
+```bash
+set tabstop=2
+set shiftwidth=2
+set softtabstop=2
+set expandtab
+set autoindent
+```

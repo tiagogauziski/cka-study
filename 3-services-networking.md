@@ -5,6 +5,7 @@
 1. [Understand connectivity between Pods](#understand-connectivity-between-pods)
 1. [Understand ClusterIP, NodePort, LoadBalancer service types and endpoints](#understand-clusterip-nodeport-loadbalancer-service-types-and-endpoints)
 1. [Know how to use Ingress controllers and Ingress resources](#know-how-to-use-ingress-controllers-and-ingress-resources)
+1. [Know how to configure and use CoreDNS](#know-how-to-configure-and-use-coredns)
 
 ## Understand host networking configuration on the cluster nodes
 Reference: 
@@ -684,12 +685,65 @@ curl http://second.127.0.0.1.nip.io:32284/
 
 </details>
 
-## Know how to use Ingress controllers and Ingress resources
+## Know how to configure and use CoreDNS
 Reference:
-- https://kubernetes.io/docs/tasks/administer-cluster/coredns/
 - https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/
+- https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
 
 <details>
 <summary>Solution</summary>
+
+### How to get CoreDNS ConfigMap
+
+- To get CoreDNS `ConfigMap`:
+```bash
+kubectl get configmap coredns -n kube-system -o yaml
+
+# Output: 
+# apiVersion: v1
+# data:
+#   Corefile: |
+#     .:53 {
+#         errors
+#         health {
+#            lameduck 5s
+#         }
+#         ready
+#         kubernetes cluster.local in-addr.arpa ip6.arpa {
+#            pods insecure
+#            fallthrough in-addr.arpa ip6.arpa
+#            ttl 30
+#         }
+#         prometheus :9153
+#         forward . /etc/resolv.conf {
+#            max_concurrent 1000
+#         }
+#         cache 30
+#         loop
+#         reload
+#         loadbalance
+#     }
+# kind: ConfigMap
+# metadata:
+#   creationTimestamp: "2022-07-04T11:11:08Z"
+#   name: coredns
+#   namespace: kube-system
+#   resourceVersion: "228"
+#   uid: fa62b821-c958-4adb-bb13-8885f62d54d9
+```
+
+- To edit CoreDNS `ConfigMap`:
+```bash
+# It's possible to use kubectl edit
+kubectl edit configmap coredns -n kube-system
+
+# It's also possible to export it and apply the changes again
+kubectl get configmap coredns -n kube-system -o yaml > coredns-configmap.yaml
+
+kubectl apply -f coredns-configmap.yaml
+```
+
+### Configuration of Stub-domain and upstream nameserver using CoreDNS
+
 
 </details>

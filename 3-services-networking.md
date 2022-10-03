@@ -745,5 +745,76 @@ kubectl apply -f coredns-configmap.yaml
 
 ### Configuration of Stub-domain and upstream nameserver using CoreDNS
 
+- If a cluster operator has a Consul domain server located at "10.150.0.1", and all Consul names have the suffix ".consul.local". To configure it in CoreDNS, the cluster administrator creates the following stanza in the CoreDNS ConfigMap.
 
+```
+consul.local:53 {
+    errors
+    cache 30
+    forward . 10.150.0.1
+}
+```
+
+- The final ConfigMap along with the default Corefile configuration looks like:
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+     .:53 {
+         errors
+         health {
+            lameduck 5s
+         }
+         ready
+         kubernetes cluster.local in-addr.arpa ip6.arpa {
+            pods insecure
+            fallthrough in-addr.arpa ip6.arpa
+            ttl 30
+         }
+         prometheus :9153
+         forward . /etc/resolv.conf {
+            max_concurrent 1000
+         }
+         cache 30
+         loop
+         reload
+         loadbalance
+     }
+    consul.local:53 {
+        errors
+        cache 30
+        forward . 10.150.0.1
+    }    
+```
+
+- It's possible to check the applied configuration when opening CoreDNS logs:
+```bash
+# Create a test pod and make some nslookup calls to the domain
+kubectl run -i --tty alpine --image=alpine --restart=Never --rm -- sh
+
+# Within the shell, perform nslookup on the nameserver
+nslookup tiago.consul.local
+
+# The timeout exception is expected, as the IP address does not exits.
+# Exit the Pod shell
+
+# Get CoreDNS logs
+kubectl logs --namespace=kube-system -l k8s-app=kube-dns
+
+# Output:
+# ...
+# [INFO] Reloading
+# [INFO] plugin/health: Going into lameduck mode for 5s
+# [INFO] plugin/reload: Running configuration MD5 = 0c47862bd37d6e0115271158c7eb8882
+# [INFO] Reloading complete
+# [ERROR] plugin/errors: 2 tiago.consul.local. A: read udp 10.244.0.38:56073->10.150.0.1:53: i/o timeout
+# [ERROR] plugin/errors: 2 tiago.consul.local. AAAA: read udp 10.244.0.38:43004->10.150.0.1:53: i/o timeout
+# [ERROR] plugin/errors: 2 tiago.consul.local. A: read udp 10.244.0.38:52349->10.150.0.1:53: i/o timeout
+# [ERROR] plugin/errors: 2 tiago.consul.local. AAAA: read udp 10.244.0.38:40721->10.150.0.1:53: i/o timeout
+# ...
+```
 </details>

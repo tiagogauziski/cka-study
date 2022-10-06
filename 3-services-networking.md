@@ -6,6 +6,7 @@
 1. [Understand ClusterIP, NodePort, LoadBalancer service types and endpoints](#understand-clusterip-nodeport-loadbalancer-service-types-and-endpoints)
 1. [Know how to use Ingress controllers and Ingress resources](#know-how-to-use-ingress-controllers-and-ingress-resources)
 1. [Know how to configure and use CoreDNS](#know-how-to-configure-and-use-coredns)
+1. [Choose an appropriate container network interface plugin](#choose-an-appropriate-container-network-interface-plugin)
 
 ## Understand host networking configuration on the cluster nodes
 Reference: 
@@ -817,4 +818,22 @@ kubectl logs --namespace=kube-system -l k8s-app=kube-dns
 # [ERROR] plugin/errors: 2 tiago.consul.local. AAAA: read udp 10.244.0.38:40721->10.150.0.1:53: i/o timeout
 # ...
 ```
+</details>
+
+## Choose an appropriate container network interface plugin
+Reference:
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#pod-network
+- https://kubernetes.io/docs/concepts/cluster-administration/addons/
+- https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#initializing-your-control-plane-node (point #2)
+<details>
+<summary>Solution</summary>
+
+- You must deploy a Container Network Interface (CNI) based Pod network add-on so that your Pods can communicate with each other. CoreDNS will not start up before a network is installed.
+- Take care that the Pod network must not overlap with any of the host networks. Container finding a suitable CIDR block to use during `kubeadm init --pod-network-cidr`.
+  - If you use a custom CIDR block, make sure to change the CNI addon `.yaml` when appling. 
+- The classless reserved IP ranges for Private Networks are:
+  - 10.0.0.0/8 (16.777.216 addresses)
+  - 172.16.0.0/12 (1.048.576 addresses)
+  - 192.168.0.0/16 (65.536 addresses)
+
 </details>

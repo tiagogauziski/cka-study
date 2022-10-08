@@ -9,6 +9,7 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 1. [Cluster Architecture, Installation & Configuration](1-cluster-architecture-installation-configuration.md)
 1. [Workloads & Scheduling](2-workloads-scheduling.md)
 1. [Services & Networking](3-services-networking.md)
+1. [Storage](4-storage.md)
 
 
 ## Helpful commands

@@ -6,6 +6,8 @@
 ## Understand storage classes, persistent volumes
 Reference: 
 - https://kubernetes.io/docs/concepts/storage/storage-classes/
+- https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/
+- https://kubernetes.io/blog/2017/03/dynamic-provisioning-and-storage-classes-kubernetes/
 
 <details>
 <summary>Solution</summary>
@@ -13,7 +15,7 @@ Reference:
 ### `StorageClass`
 A storage class provides a way for administrator to describe the "classes" of storage they offer. Different classes might map to different quality-of-service levels, backup policies or to arbitrary policies determined by the cluster administrators. This concept is something called "profiles" in other storage systems.
 
-Basically a `StorageClass` is a way for cluster administrator to configure metadata useful for external storage provider to configure the underlying persistent volume. 
+Basically a `StorageClass` is a way for cluster administrator to configure metadata useful for external storage provider to configure the underlying persistent volume dynamically. 
 
 When a `PersistentVolume` is created from a `PersistentVolumeClaim` that sets a specific `StorageClass`, the `PersistentVolume` will be dynamically provisioned based on the details from the `StorageClass`.
 
@@ -45,5 +47,34 @@ Note that:
   - The default value is `Immediate`. When set to `Immediate`, the volume binding and dynamic provisioning occurs once the `PersistentVolumeClaim` is created. 
   - For storage backends that are topology-constrained and not globally accessible from all Nodes in the cluster, `PersistentVolume` will be bound or provisioned without knowledge of the Pod's scheduling requirements. This may result in unschedulable Pods.
   - A cluster administrator can address this issue by set `volumeBindingMode` to `WaitForFirstConsumer`, which will delay the binding and provisioning of a `PersistentVolume` until a Pod using the `PersistentVolumeClaim` is created.
+
+
+### `PersistentVolume`
+
+A `PersistentVolume` is a piece of storage in the cluster that has been provisioned by an administrator or dynamically provisioned using `StorageClass`. It is a resource in the cluster just like a node is a cluster resource. `PersistentVolume` have a lifecycle independent of any individual Pod that uses the PV.  
+When a user creates a `PersistentVolumeClaim` with a specific amount of storage requested and with a certain access modes, a control loop in the master watches for new `PersistentVolumeClaim`s, finds a matching `PersistentVolume` if possible and binds them together. If the `PersistentVolume` was dynamically provisioned for a new `PersistentVolumeClaim`, the loop will always bind that `PersistentVolume` to the `PersistentVolumeClaim`.  
+The user will always get at lest what they asked for, but the volume may be in excess of what was requested. Once bound, `PersistentVolumeClaim` binds are exclusive, regardless of how they were bound. 
+
+Consider the following `PersistentVolume`:
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv0003
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: slow
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 172.17.0.2
+```
 
 </details>

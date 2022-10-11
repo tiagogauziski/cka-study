@@ -12,6 +12,9 @@ Reference:
 <details>
 <summary>Solution</summary>
 
+![Persistent storage objects](/img/4-persistent-storage-objects.png "Persistent storage objects")
+Source: https://www.youtube.com/watch?v=_qfSzrPn9Cs
+
 ### `StorageClass`
 A storage class provides a way for administrator to describe the "classes" of storage they offer. Different classes might map to different quality-of-service levels, backup policies or to arbitrary policies determined by the cluster administrators. This concept is something called "profiles" in other storage systems.
 
@@ -76,5 +79,21 @@ spec:
     path: /tmp
     server: 172.17.0.2
 ```
+
+Note that:
+- `capacity` defines a specific storage capacity a `PersistentVolume` will have.
+- Kubernetes supports two `volumeModes`: `Filesystem` and `Block`
+  - `Filesystem`: a volume is mounted into Pods into a directory. If the volume is backed by a block device and the device is empty, Kubernetes creates a filesystem on the device before mounting it for the first time.
+  - `Block`: to use a volume as a raw block device. Such volume is presented into a Pod as a block device, without any filesystem on it. This mode is useful to provide a Pod the fastest posible way to access a volume, without any filesystem layer between the Pod and the volume. 
+- `accessMode`
+  - `ReadWriteOnce` (RWO) - the volume can be mounted as read-write by a single node, but it still can allow multiple pods to access the volume when pods are running on the same node.
+  - `ReadOnlyMany` (ROX) - the volume can be mounted as read-only by many nodes.
+  - `ReadWriteMany` (RWX) - the volume can be mounted as read-write by many nodes.
+  - `ReadWriteOncePod` (RWOP) - the volume can be mounted as read-write by a single Pod. You can use it to ensure one Pod across the whole cluster can read that `PersistentVolumeClaim` or write to it.
+  - `persistentVolumeReclaimPolicy`:
+    - `Retain` - the volume is retained after the PVC no longer exists. Safer option.
+    - `Recycle` - it runs a script to clear the contents (`rm -rf /thevolume/*`) (this option should be avoided)
+    - `Delete` - the volume and associated storrage assest such as any external resources (AWS EBS, CCE PD, Azure Disk) is deleted.
+
 
 </details>

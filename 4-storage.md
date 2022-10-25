@@ -2,18 +2,20 @@
 
 ## Table of contents
 1. [Understand storage classes, persistent volumes](#understand-storage-classes-persistent-volumes)
+1. [Understand volume mode, access modes and reclaim policies for volumes](#understand-volume-mode-access-modes-and-reclaim-policies-for-volumes)
+
+![Persistent storage objects](/img/4-persistent-storage-objects.png "Persistent storage objects")
+Source: https://www.youtube.com/watch?v=_qfSzrPn9Cs
 
 ## Understand storage classes, persistent volumes
 Reference: 
 - https://kubernetes.io/docs/concepts/storage/storage-classes/
+- https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 - https://kubernetes.io/docs/tasks/configure-pod-container/configure-persistent-volume-storage/
 - https://kubernetes.io/blog/2017/03/dynamic-provisioning-and-storage-classes-kubernetes/
 
 <details>
 <summary>Solution</summary>
-
-![Persistent storage objects](/img/4-persistent-storage-objects.png "Persistent storage objects")
-Source: https://www.youtube.com/watch?v=_qfSzrPn9Cs
 
 ### `StorageClass`
 A storage class provides a way for administrator to describe the "classes" of storage they offer. Different classes might map to different quality-of-service levels, backup policies or to arbitrary policies determined by the cluster administrators. This concept is something called "profiles" in other storage systems.
@@ -95,5 +97,52 @@ Note that:
     - `Recycle` - it runs a script to clear the contents (`rm -rf /thevolume/*`) (this option should be avoided)
     - `Delete` - the volume and associated storrage assest such as any external resources (AWS EBS, CCE PD, Azure Disk) is deleted.
 
+</details>
+
+## Understand volume mode, access modes and reclaim policies for volumes
+Reference: 
+- https://kubernetes.io/docs/concepts/storage/storage-classes/
+- https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistent-volumes
+
+<details>
+<summary>Solution</summary>
+
+These topics have been cover on the notes section from the previous section. Let's bring these concepts back again.
+
+### Volume modes
+
+Volume mode is assigned to a `PersistentVolume` using the `volumeMode` field.
+
+Kubernetes supports two `volumeModes`: `Filesystem` and `Block`.
+- `Filesystem`: a volume is mounted into Pods into a directory. If the volume is backed by a block device and the device is empty, Kubernetes creates a filesystem on the device before mounting it for the first time.
+- `Block`: to use a volume as a raw block device. Such volume is presented into a Pod as a block device, without any filesystem on it. This mode is useful to provide a Pod the fastest posible way to access a volume, without any filesystem layer between the Pod and the volume. 
+
+### Access modes
+
+Acesss mode is assigned to a `PersistentVolume` using the `accessModes` array.
+
+- `ReadWriteOnce` (RWO) - the volume can be mounted as read-write by a single node, but it still can allow multiple pods to access the volume when pods are running on the same node.
+- `ReadOnlyMany` (ROX) - the volume can be mounted as read-only by many nodes.
+- `ReadWriteMany` (RWX) - the volume can be mounted as read-write by many nodes.
+- `ReadWriteOncePod` (RWOP) - the volume can be mounted as read-write by a single Pod. You can use it to ensure one Pod across the whole cluster can read that `PersistentVolumeClaim` or write to it.
+
+### Reclaim policy
+
+Reclaim policy can set on either on a `StorageClass` as well as on a `PersistentVolume`:
+- For dynamic provisioned `PersistentVolumes`, you can use `StorageClass` `reclaimPolicy` field. The `PersistentVolume` created will inherit the value from the `StorageClass`
+- For static provisioned `PersistentVolumes`, it's possible to use `persistentVolumeReclaimPolicy` field.
+
+- `Retain` - the volume is retained after the PVC no longer exists. Safer option.
+- `Recycle` - it runs a script to clear the contents (`rm -rf /thevolume/*`) (this option should be avoided)
+- `Delete` - the volume and associated storrage assest such as any external resources (AWS EBS, CCE PD, Azure Disk) is deleted.
+
+</details>
+
+## Understand persistent volume claims primitive
+Reference: 
+- https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+
+<details>
+<summary>Solution</summary>
 
 </details>

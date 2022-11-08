@@ -186,4 +186,140 @@ Reference:
 <details>
 <summary>Solution</summary>
 
+To configure an application with persistent storage we should have the following:
+1. Because we don't have dynamically provision enabled, we will can create a `StorageClass` in order for a `PersistentVolume` to match with a `PersistentVolumeClaim`
+1. We can create a `PersistentVolume` and assing the `storageClassName` field with the name of the `StorageClass`
+1. Then we can proceed by creating a `PersistentVolumeClaim` and a `Pod` to bind it with the `PersistentVolume`. 
+1. Note that the `storageClassName` provided on both PV and PVC should match. 
+1. Note also that having a `StorageClass` is also optional for static provisioning of storage. In this case, the field should be empty of both PV and PVC.
+
+- For this example, we want to create a NGINX pod and serve a file inside the PV. To do that, we need to create a `index.html` on every worker node:
+```bash
+# Check all the worker nodes:
+kubectl get nodes
+
+# Output:
+# NAME          STATUS   ROLES                  AGE    VERSION
+# k8s-control   Ready    control-plane,master   126d   v1.23.5
+# k8s-worker1   Ready    <none>                 126d   v1.23.5
+# k8s-worker2   Ready    <none>                 126d   v1.23.5
+
+# SSH into every worker and create the file:
+sudo mkdir /mnt/data
+sudo sh -c "echo 'Hello from Kubernetes storage' > /mnt/data/index.html"
+```
+
+- Lets create a `StorageClass` (sample-storageclass.yaml):
+```yaml 
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sample-storageclass
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+```
+
+- Let's check the created `StorageClass`:
+```bash
+# Create the StorageClass
+kubectl create -f sample-storageclass.yaml
+
+# View the StorageClass
+kubectl get storageclass
+
+# Output:
+# NAME                  PROVISIONER                    RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+# sample-storageclass   kubernetes.io/no-provisioner   Delete          WaitForFirstConsumer   false                  25m
+```
+
+- Let's create a `PersistentVolume` that uses the `StorageClass` above (we are doing static provisioning here) (sample-persistentvolume.yaml):
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sample-persistentstorage
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteMany
+  storageClassName: sample-storageclass
+  hostPath:
+    path: "/mnt/data"
+```
+
+- Let's create and check the PV:
+```bash
+# Create the PV
+kubectl create -f sample-persistentvolume.yaml
+
+# View the PV
+kubectl get pv
+
+# Output:
+# NAME                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS             REASON   AGE
+# sample-persistentstorage   1Gi        RWX            Retain           Available           sample-storageclass               35m
+```
+
+- Next step is to create a `PersistentVolumeClaim` to request physical storage and a `Pod` to consume it:
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sample-persistentvolumeclaim
+spec:
+  storageClassName: sample-storageclass
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sample-persistentvolumeclaim-pod
+spec:
+  volumes:
+  - name: nginx-storage
+    persistentVolumeClaim:
+      claimName: sample-persistentvolumeclaim
+  containers:
+  - name: nginx
+    image: nginx
+    ports:
+    - name: http
+      containerPort: 80
+    volumeMounts:
+    - name: nginx-storage
+      mountPath: "/usr/share/nginx/html"
+```
+
+- Let's create and check the PVC and Pod:
+```bash
+# Create the resources
+kubectl create -f sample-persistentvolumeclaim-pod.yaml
+
+# Lets check the status of the PVC
+kubectl get pvc
+
+# Output: 
+# NAME                           STATUS   VOLUME                     CAPACITY   ACCESS MODES   STORAGECLASS          AGE
+# sample-persistentvolumeclaim   Bound    sample-persistentstorage   1Gi        RWX            sample-storageclass   3s
+
+# Lets check the Pod
+kubectl get pod -o wide
+
+# Output: 
+# NAME                               READY   STATUS    RESTARTS   AGE   IP            NODE          NOMINATED NODE   READINESS GATES
+# sample-persistentvolumeclaim-pod   1/1     Running   0          75s   10.244.1.25   k8s-worker1   <none>           <none>
+
+# If we curl the Pod IP, we should get back the index.html content we previously set:
+curl 10.244.1.25
+
+# Output:
+# Hello from Kubernetes storage
+```
+
 </details>

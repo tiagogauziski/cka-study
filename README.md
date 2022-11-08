@@ -10,6 +10,7 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 1. [Workloads & Scheduling](2-workloads-scheduling.md)
 1. [Services & Networking](3-services-networking.md)
 1. [Storage](4-storage.md)
+1. [Troubleshooting](5-troubleshooting.md)
 
 
 ## Helpful commands

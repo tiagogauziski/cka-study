@@ -5,6 +5,7 @@
 1. [Understand volume mode, access modes and reclaim policies for volumes](#understand-volume-mode-access-modes-and-reclaim-policies-for-volumes)
 1. [Understand persistent volume claims primitive](#understand-persistent-volume-claims-primitive)
 1. [Know how to configure applications with persistent storage](#know-how-to-configure-applications-with-persistent-storage)
+1. [Bonus: Dynamically provisiong PersistentVolumes using Longhorn (CSI)](#bonus-dynamically-provisiong-persistentvolumes-using-longhorn-csi)
 
 
 ![Persistent storage objects](/img/4-persistent-storage-objects.png "Persistent storage objects")
@@ -321,5 +322,90 @@ curl 10.244.1.25
 # Output:
 # Hello from Kubernetes storage
 ```
+
+</details>
+
+
+## Bonus: Dynamically provisiong PersistentVolumes using Longhorn (CSI)
+Reference: 
+- https://longhorn.io/docs/1.3.2/volumes-and-nodes/create-volumes/
+
+<details>
+<summary>Solution</summary>
+
+In this example, we are going to enable dynamic provisioning of `PersistentVolumes` using Longhorn as CSI.
+
+- Let's first install Longhorn:
+```bash
+# Install longhorn
+kubectl apply -f https://raw.githubusercontent.com/longhorn/longhorn/v1.3.2/deploy/longhorn.yaml
+```
+
+- Let's check the default `StorageClass` created:
+```bash
+kubectl get storageclass
+
+# Output
+# NAME                 PROVISIONER          RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+# longhorn (default)   driver.longhorn.io   Delete          Immediate           true                   46h
+```
+
+- Let's create a PVC and a Pod to consume the volume:
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: longhorn-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: longhorn-pod-test
+spec:
+  containers:
+  - name: longhorn-pod
+    image: alpine
+    imagePullPolicy: IfNotPresent
+    command: ['sh', '-c', 'echo "storage test" > /data/test.txt; sleep 3600']
+    volumeMounts:
+    - name: longhorn-volume
+      mountPath: /data
+  volumes:
+  - name: longhorn-volume
+    persistentVolumeClaim:
+      claimName: longhorn-pvc
+```
+
+- Let's check the dynamic provisioned resources:
+```bash
+# Let's check the PV created
+kubectl get pv
+
+# Output
+# NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                  STORAGECLASS   REASON   AGE
+# pvc-eee7071d-404a-41a2-96dd-602221ef881d   100Mi      RWX            Delete           Bound    default/longhorn-pvc   longhorn                102s
+
+# Let's check the status of the PVC
+kubectl get pvc
+
+# Output
+# NAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# longhorn-pvc   Bound    pvc-eee7071d-404a-41a2-96dd-602221ef881d   100Mi      RWX            longhorn       3m17s
+
+# And finally the pod consuming the PVC
+kubectl get pod
+
+# Output
+# NAME                READY   STATUS    RESTARTS   AGE
+# longhorn-pod-test   1/1     Running   0          4m49s
+```
+
 
 </details>

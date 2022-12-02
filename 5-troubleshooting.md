@@ -5,6 +5,7 @@
 
 ## Evaluate cluster and node logging
 Reference: 
+- https://kubernetes.io/docs/concepts/cluster-administration/logging/
 
 <details>
 <summary>Solution</summary>

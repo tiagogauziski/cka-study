@@ -20,11 +20,27 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 kubectl run -i --tty alpine --image=alpine --restart=Never --rm -- sh
 ```
 
-## .vimrc (~/.vimrc)
+### .vimrc (~/.vimrc)
 ```bash
 set tabstop=2
 set shiftwidth=2
 set softtabstop=2
 set expandtab
 set autoindent
+```
+
+
+### Linux `journalctl` usage:
+```bash
+# Tail logs from kubelet (live updates) 
+# -f or --follow 
+journalctl -u kubelet -f
+
+# Jump to the end of the log
+# -e or --page-end
+journalctl -u kubelet -e
+
+# Show the most recent number of *n* number of log lines
+# -n or --lines
+journalctl -u kubelet -n 10
 ```

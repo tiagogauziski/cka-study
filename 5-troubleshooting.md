@@ -54,8 +54,76 @@ ls /var/log/pods/
 ## Understand how to monitor applications
 Reference: 
 - https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+- https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-usage-monitoring/
+- https://github.com/kubernetes-sigs/metrics-server
 
 <details>
 <summary>Solution</summary>
 
+Monitoring is a broad topic, so we will cover in two different steps:
+- Monitoring application health
+- Metrics
+
+### Monitoring application health
+
+Application monitoring can be done with `livenessProbes`, `readinessProbes` and `startupProbes`:
+- `livenessProbe`  
+Liveness probes allow you to customise the default detection mechanism and make it more sophisticated.    
+By default, Kubernetes will only consider a container to "down" and apply the restart policy if the container process stops.
+> By default, Kubernetes will decide whether to restart the container based on the status of container's PID 1 process.  
+> The first process to run on a container assumes PID 1. 
+
+- `readinessProbe`
+Indicates whether the container is ready to respond to requests. If the readiness probe fails, the Endpoint controller (related to Services) removes the Pod's IP address from the endpoints of all Services that match the Pod.
+The default state of readiness before the initial delay is `Failure`. If a container does not provide a readiness probe, the default state is `Success`.
+
+- `startupProbe`
+Indicates whether the aplication within the container is started. All other probes are disabled if a startup probe is provided, until it succeeds. If the startup probe fails, the kubelet kill the container, and the container is subjected to it's restart policy. 
+> Similar to `livenessProbe`, however, while liveness probe run constantly, startup probes run at the container startup and stop running once it succeed.  
+> Useful for legacy applications with long startup times.
+
+> Note: check the hands-on steps on the previous topics:
+> [Investigate the default `livenessProbe` behavior](2-workloads-scheduling.md#investigate-the-default-livenessprobe-behavior)
+> [Configure a `livenessProbe` with `exec` command](2-workloads-scheduling.md#configure-a-livenessprobe-with-exec-command)
+> [Configure a `startupProbe` with `exec` command](2-workloads-scheduling.md#configure-a-startupprobe-with-exec-command)
+> [Configure a `readinessProbe` with `exec` command](2-workloads-scheduling.md#configure-a-readinessprobe-with-exec-command)
+
+### Metrics
+
+There are two ways of setup metrics on Kubernetes:
+ - Use `metrics-server`: it provides a lightweight, short-term, in-memory way of collecting CPU and memory metrics from Pods and Nodes to be used for scaling or resource limits enforcement.
+ - Use Prometheus to monitor Kubernetes resource to provide a full metrics pipeline, and it you access to richer metrics.
+
+ This example will explore the use of `metrics-server` for quick access of the cluster metrics.
+
+ - Install `metrics-server` by running applying the following YAML manifest:
+ ```bash
+# One of the requirements for metrics server is the following:
+# Kubelet certificate needs to be signed by cluster Certificate Authority (or disable certificate validation by passing --kubelet-insecure-tls to Metrics Server)
+# So, in order to make it work on our cluster, we need to add `--kubelet-insecure-tls` argument into the deployment resource.
+wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml -O metrics-server.yaml
+
+# Edit the file and include the additional argument on the Deployment 
+vim metrics-server.yaml
+# containers:
+#      - args:
+#        - --cert-dir=/tmp
+#        - --secure-port=4443
+#        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+#        - --kubelet-use-node-status-port
+#        - --metric-resolution=15s
+#        - --kubelet-insecure-tls
+#        image: k8s.gcr.io/metrics-server/metrics-server:v0.6.2
+
+# Apply the resources
+kubectl apply -f metrics-server.yaml
+
+# Get nodes metrics
+kubectl top nodes
+
+# NAME          CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+# k8s-control   51m          2%     822Mi           21%
+# k8s-worker1   12m          0%     487Mi           12%
+# k8s-worker2   11m          0%     625Mi           16%
+ ```
 </details>

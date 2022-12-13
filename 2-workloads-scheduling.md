@@ -801,7 +801,7 @@ The default state of readiness before the initial delay is `Failure`. If a conta
 
 - `startupProbe`
 Indicates whether the aplication within the container is started. All other probes are disabled if a startup probe is provided, until it succeeds. If the startup probe fails, the kubelet kill the container, and the container is subjected to it's restart policy. 
-> Similar to `lievenessProbe`, however, while liveness probe run constantly, startup probes run at the container startup and stop running once it succeed.  
+> Similar to `livenessProbe`, however, while liveness probe run constantly, startup probes run at the container startup and stop running once it succeed.  
 > Useful for legacy applications with long startup times.
 
 ### Investigate the default `livenessProbe` behavior

@@ -55,7 +55,7 @@ wget https://github.com/containerd/containerd/releases/download/v1.6.15/containe
 wget https://github.com/containerd/containerd/releases/download/v1.6.15/containerd-1.6.15-linux-arm64.tar.gz
 
 # Unpack into /usr/local/bin/ (change the arch in case of ARM64)
-sudo tar Cxzvf /usr/local containerd-1.6.8-linux-amd64.tar.gz
+sudo tar Cxzvf /usr/local containerd-1.6.15-linux-amd64.tar.gz
 
 # Download runc command line tool
 # AMD64

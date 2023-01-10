@@ -44,6 +44,9 @@ journalctl -u kubelet -n 10
 ```
 
 ### Install containerd manually
+Source: 
+- https://github.com/containerd/containerd/blob/main/docs/getting-started.md
+
 ```bash
 # Download containerd binaries
 # AMD64

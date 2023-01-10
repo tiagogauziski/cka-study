@@ -12,7 +12,6 @@ https://github.com/cncf/curriculum/blob/master/CKA_Curriculum_v1.23.pdf
 1. [Storage](4-storage.md)
 1. [Troubleshooting](5-troubleshooting.md)
 
-
 ## Helpful commands
 
 ### Create a Pod to troubleshoot cluster
@@ -28,7 +27,6 @@ set softtabstop=2
 set expandtab
 set autoindent
 ```
-
 
 ### Linux `journalctl` usage:
 ```bash
@@ -98,4 +96,27 @@ sudo systemctl enable --now containerd
 
 # Verify containerd service status
 sudo systemctl status containerd
+```
+
+### Install metrics server with `--kubelet-insecure-tls`
+```bash
+# Download metrics server components
+wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml -O metrics-server.yaml
+
+# Use vim to open the file and append --kubelet-insecure-tls into the deployment container 
+# ...
+#       containers:
+#      - args:
+#        - --cert-dir=/tmp
+#        - --secure-port=4443
+#        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+#        - --kubelet-use-node-status-port
+#        - --metric-resolution=15s
+#  >>>>> - --kubelet-insecure-tls  <<<<<
+#        image: k8s.gcr.io/metrics-server/metrics-server:v0.6.2
+# ...
+vim metrics-server.yaml
+
+# Install metrics server
+kubectl apply -f metrics-server.yaml
 ```

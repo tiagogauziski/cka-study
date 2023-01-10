@@ -349,7 +349,7 @@ An Ingress does not expose arbitrary ports or protocols. Exposing services other
 
 - Install the NGINX ingress controller using the following YAML definition:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.3.0/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml
 ```
 
 - Get the installed IngressClass:

@@ -3,6 +3,7 @@
 ## Table of contents
 1. [Evaluate cluster and node logging](#evaluate-cluster-and-node-logging)
 1. [Understand how to monitor applications](#understand-how-to-monitor-applications)
+1. [Manage container stdout & stderr logs](#manage-container-stdout--stderr-logs)
 
 ## Evaluate cluster and node logging
 Reference: 
@@ -126,4 +127,126 @@ kubectl top nodes
 # k8s-worker1   12m          0%     487Mi           12%
 # k8s-worker2   11m          0%     625Mi           16%
  ```
+</details>
+
+
+## Manage container stdout & stderr logs
+Reference: 
+- https://kubernetes.io/docs/concepts/cluster-administration/logging/
+- https://kubernetes.io/docs/reference/kubectl/cheatsheet/#interacting-with-running-pods
+- https://kubernetes.io/docs/reference/kubectl/cheatsheet/#interacting-with-deployments-and-services
+
+<details>
+<summary>Solution</summary>
+
+The easiest way is to execute `kubectl logs` to access pods or deployments logs.
+
+### Access `Pod` logs using `kubectl logs`
+To access container stdout and stderr logs, you can use `kubectl logs` command:
+```bash
+# Lets create a nginx pod
+kubectl run nginx --image=nginx
+
+# Get stdout logs from pod (single container)
+kubectl logs pod/nginx
+
+# Delete the pod
+kubectl delete pod nginx
+```
+
+It's also possible to access logs from different container inside the same pod (multi container scenario):
+```bash
+# Create a pod with multiple containers
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-container-counter
+spec:
+  containers:
+  - name: counter-1
+    image: busybox:1.28
+    args: [/bin/sh, -c,
+            'i=0; while true; do echo "(counter-1) \$i: \$(date)"; i=\$((i+1)); sleep 10; done']
+  - name: counter-2
+    image: busybox:1.28
+    args: [/bin/sh, -c,
+            'i=0; while true; do echo "(counter-2) \$i: \$(date)"; i=\$((i+1)); sleep 10; done']
+EOF
+
+# Get container logs from container `counter-1`
+kubectl logs pod/multi-container-counter --container counter-1
+
+# Output:
+# (counter-1) 0: Sun Apr 16 04:23:29 UTC 2023
+# (counter-1) 1: Sun Apr 16 04:23:39 UTC 2023
+# (counter-1) 2: Sun Apr 16 04:23:49 UTC 2023
+
+# Get container logs from container `counter-2`
+kubectl logs pod/multi-container-counter --container counter-2
+
+# Output
+# (counter-2) 0: Sun Apr 16 04:23:29 UTC 2023
+# (counter-2) 1: Sun Apr 16 04:23:39 UTC 2023
+# (counter-2) 2: Sun Apr 16 04:23:49 UTC 2023
+
+# Delete the deployment
+kubectl delete pod multi-container-counter
+```
+
+### Access `Deployment` logs using `kubectl logs`
+
+```bash
+# Create a deployment with multiple containers
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-container-logs-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels: 
+      app: multi-container-logs
+  template:
+    metadata:
+      labels:
+        app: multi-container-logs
+    spec:
+      containers:
+      - name: counter-1
+        image: busybox:1.28
+        args: [/bin/sh, -c,
+                'i=0; while true; do echo "(\$POD_NAME) (counter-1) \$i: \$(date)"; i=\$((i+1)); sleep 10; done']
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+      - name: counter-2
+        image: busybox:1.28
+        args: [/bin/sh, -c,
+                'i=0; while true; do echo "(\$POD_NAME) (counter-2) \$i: \$(date)"; i=\$((i+1)); sleep 10; done']
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+EOF
+
+# Get all logs from all containers running under the deployment (using label selector)
+kubectl logs -l app=multi-container-logs --all-containers
+
+# Output
+# (multi-container-logs-deployment-754fbf6dd9-2dr7n) (counter-1) 0: Sun Apr 16 05:05:41 UTC 2023
+# (multi-container-logs-deployment-754fbf6dd9-2dr7n) (counter-2) 0: Sun Apr 16 05:05:42 UTC 2023
+# (multi-container-logs-deployment-754fbf6dd9-92z9w) (counter-1) 0: Sun Apr 16 05:05:41 UTC 2023
+# (multi-container-logs-deployment-754fbf6dd9-92z9w) (counter-2) 0: Sun Apr 16 05:05:42 UTC 2023
+# (multi-container-logs-deployment-754fbf6dd9-9qhsd) (counter-1) 0: Sun Apr 16 05:05:41 UTC 2023
+# (multi-container-logs-deployment-754fbf6dd9-9qhsd) (counter-2) 0: Sun Apr 16 05:05:42 UTC 2023
+
+# Delete the deployment
+kubectl delete deployment multi-container-logs-deployment
+```
+
 </details>

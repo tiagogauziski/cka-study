@@ -325,7 +325,7 @@ spec:
     image: nginx
     ports:
     - name: http
-      hostPort: 111
+      hostPort: 22
       containerPort: 80
 EOF
 ```

@@ -4,6 +4,7 @@
 1. [Evaluate cluster and node logging](#evaluate-cluster-and-node-logging)
 1. [Understand how to monitor applications](#understand-how-to-monitor-applications)
 1. [Manage container stdout & stderr logs](#manage-container-stdout--stderr-logs)
+1. [Troubleshoot application failure](#troubleshoot-application-failure)
 
 ## Evaluate cluster and node logging
 Reference: 
@@ -248,5 +249,86 @@ kubectl logs -l app=multi-container-logs --all-containers
 # Delete the deployment
 kubectl delete deployment multi-container-logs-deployment
 ```
+
+</details>
+
+
+## Troubleshoot application failure
+Reference:
+- https://kubernetes.io/docs/tasks/debug/debug-application/
+- https://kubernetes.io/docs/tasks/debug/debug-application/debug-pods/
+- https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/
+<details>
+
+### Debuging Pods
+The first step in troubleshooting is triage:
+- What is the problem?
+- Is your Pods running?
+- What is the Pod state? Is it crashing?
+- Is there any relevant logs? 
+
+#### My pod stays pending
+If a Pod is stuck in `Pending` state, it means it cannot be scheduled onto a node. Generally this is because there are insufficient resources that is preventing scheduling.
+Check the output from `kubectl describe pod ...` for more information.
+Common reasons for `Pending`
+- **You don't have enough resources**: There is not enough Memory or CPU available on your cluster. You can adjust the resource requests or add a new node to your cluster.
+- **You are using hostPort**: When you bind a Pod to a hostPort, there are limited number of places that the Pod can be scheduled. You should use `Services` to expose the Pod's ports. If you do require hostPort then you are limited by the number of nodes on your cluster.
+
+```bash
+# A pod requesting too much resources:
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: greedy-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    resources:
+      requests:
+        cpu: 100
+EOF
+
+# Lets check the pod status
+kubectl get pod
+
+# Output:
+# NAME         READY   STATUS    RESTARTS   AGE
+# greedy-pod   0/1     Pending   0          8s
+
+kubectl describe pod greedy-pod
+
+# Output:
+# Name:             greedy-pod
+# Namespace:        default
+# Priority:         0
+# Service Account:  default
+# Node:             <none>
+# Labels:           <none>
+# Annotations:      <none>
+# Status:           Pending
+# ...
+# Events:
+#  Type     Reason            Age   From               Message
+#  ----     ------            ----  ----               -------
+#  Warning  FailedScheduling  48s   default-scheduler  0/3 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }, 2 Insufficient cpu. preemption: 0/3 nodes are available: # 1 Preemption is not helpful for scheduling, 2 No preemption victims found for incoming pod..
+
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostportpod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+    ports:
+    - name: http
+      hostPort: 111
+      containerPort: 80
+EOF
+```
+
 
 </details>

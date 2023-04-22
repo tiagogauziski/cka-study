@@ -314,20 +314,59 @@ kubectl describe pod greedy-pod
 #  ----     ------            ----  ----               -------
 #  Warning  FailedScheduling  48s   default-scheduler  0/3 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }, 2 Insufficient cpu. preemption: 0/3 nodes are available: # 1 Preemption is not helpful for scheduling, 2 No preemption victims found for incoming pod..
 
+# To get hostPort "Pending" status error, we will need to create a Deployment with more replicas than Pods in our cluster
+# In this example, we have 2 worker nodes, so we need 3 replicas
 kubectl create -f - <<EOF
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: hostportpod
+  name: hostportdeployment
 spec:
-  containers:
-  - name: nginx
-    image: nginx
-    ports:
-    - name: http
-      hostPort: 22
-      containerPort: 80
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hostport
+  template:
+    metadata:
+      labels:
+        app: hostport
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - name: http
+          hostPort: 8080
+          containerPort: 80
 EOF
+
+# Lets query all Pods
+kubectl get pods -o wide
+
+# Output
+# NAME                                  READY   STATUS    RESTARTS   AGE   IP             NODE          NOMINATED NODE   READINESS GATES
+# hostportdeployment-5ff54468c5-j4f5g   0/1     Pending   0          18s   <none>         <none>        <none>           <none>
+# hostportdeployment-5ff54468c5-mv67q   1/1     Running   0          18s   10.244.2.166   k8s-worker2   <none>           <none>
+# hostportdeployment-5ff54468c5-xgnfc   1/1     Running   0          18s   10.244.1.72    k8s-worker1   <none>           <none>
+
+# Let's check why one of the Pods is marked as "Pending"
+kubectl describe pod hostportdeployment-5ff54468c5-j4f5gH
+
+# Output
+# Name:             hostportdeployment-5ff54468c5-j4f5g
+# Namespace:        default
+# Priority:         0
+# Service Account:  default
+# Node:             <none>
+# Labels:           app=hostport
+#                   pod-template-hash=5ff54468c5
+# Annotations:      <none>
+# Status:           Pending
+# ...
+# Events:
+#   Type     Reason            Age    From               Message
+#   ----     ------            ----   ----               -------
+#   Warning  FailedScheduling  4m30s  default-scheduler  0/3 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }, 2 node(s) didn't have free ports for the requested pod ports. preemption: 0/3 nodes are available: 1 Preemption is not helpful for scheduling, 2 No preemption victims found for incoming pod..
 ```
 
 

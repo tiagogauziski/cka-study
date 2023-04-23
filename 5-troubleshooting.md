@@ -5,6 +5,7 @@
 1. [Understand how to monitor applications](#understand-how-to-monitor-applications)
 1. [Manage container stdout & stderr logs](#manage-container-stdout--stderr-logs)
 1. [Troubleshoot application failure](#troubleshoot-application-failure)
+1. [Troubleshoot cluster component failure](#troubleshoot-cluster-component-failure)
 
 ## Evaluate cluster and node logging
 Reference: 
@@ -369,5 +370,168 @@ kubectl describe pod hostportdeployment-5ff54468c5-j4f5gH
 #   Warning  FailedScheduling  4m30s  default-scheduler  0/3 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }, 2 node(s) didn't have free ports for the requested pod ports. preemption: 0/3 nodes are available: 1 Preemption is not helpful for scheduling, 2 No preemption victims found for incoming pod..
 ```
 
+#### My pod is running but not working correctly
+```bash
+# Lets create a Pod with a incorrect command (sheep does not exist)
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: incorrect-command-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ['sh', '-c', 'echo "test"; sheep 10']
+EOF
+
+# Check Pod status
+kubectl get pod -o wide
+
+# Output
+# NAME                    READY   STATUS             RESTARTS      AGE   IP            NODE          NOMINATED NODE   READINESS GATES
+# incorrect-command-pod   0/1     CrashLoopBackOff   3 (24s ago)   83s   10.244.1.74   k8s-worker1   <none>           <none>
+
+# Check pod logs
+kubectl logs incorrect-command-pod
+
+# Output
+# test
+# sh: sheep: not found
+```
+
+#### Determine termination reason of a Pod
+Termination messages provides way to store fatal error events to a location which could be retrieved by tools like kubectl or dashboards. By default, Kubernetes expects the termination logs to available on `/dev/termination-log` file.
+```bash
+# Create Pod on the namespace to test termination log messages
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: termination-log-pod
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ["/bin/sh"]
+    args: ["-c", "sleep 10 && echo 'Sleep termination' > /dev/termination-log"]
+EOF
+
+# Get Pod
+kubectl describe pod termination-log-pod
+
+
+# Output 
+# State without termination log message
+# ...
+#    State:          Terminated
+#      Reason:       Completed
+#      Exit Code:    0
+#      Started:      Sun, 23 Apr 2023 07:41:26 +0000
+#      Finished:     Sun, 23 Apr 2023 07:41:36 +0000
+
+# State with termination log message
+# ...
+#    State:      Terminated
+#      Reason:   Completed
+#      Message:  Sleep termination
+#
+#      Exit Code:  0
+#      Started:    Sun, 23 Apr 2023 07:45:10 +0000
+#      Finished:   Sun, 23 Apr 2023 07:45:20 +0000
+```
+
+It's also possible to change the `terminationMessagePolicy` field on the container. The default value is set to `File` which means the message with be extracted from the file. By setting it to `FallbackToLogsOnError`, you tell Kubernetes to use the last chunk of container log output if the termination message file is empty and the container exited with an error.
+
+#### Dedugging Pods with `kubectl exec` or `kubectl debug` commands
+- If the container image contains debugging utilities, you can run `kubectl exec`: 
+```bash
+# Create simple nginx Pod
+kubectl create -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+EOF
+
+# Extract contents from index.html file
+kubectl exec nginx-pod -- cat /usr/share/nginx/html/index.html
+
+# Output
+# <!DOCTYPE html>
+# <html>
+# <head>
+# <title>Welcome to nginx!</title>
+# ...
+
+# If we execute bash on remove, we get root privileges, and we can modify NGINX index page
+kubectl exec --stdin --tty nginx-pod -- /bin/bash
+
+# Execute:
+# $ echo 'Change from kubectl exec' > /usr/share/nginx/html/index.html
+# $ exit
+
+# Let's check nginx serving page
+kubectl get pod nginx-pod -o wide
+
+# Output
+# NAME        READY   STATUS    RESTARTS   AGE    IP             NODE          NOMINATED NODE   READINESS GATES
+# nginx-pod   1/1     Running   0          109m   10.244.2.167   k8s-worker2   <none>           <none>
+
+# cURL the Pod's IP
+curl 10.244.2.167
+
+# Output:
+# Change from kubectl exec
+```
+- From Kubernetes 1.25 onwards, it's possible to use `kubectl debug` commands to create **ephemeral containers**, useful for situations when the main container is failing and the image does not include debugging utilities.
+```bash
+# Create a pod based on a pause container, which does not include any debugging utilities.
+kubectl run ephemeral-demo --image=registry.k8s.io/pause:3.1 --restart=Never
+
+# Try `kubectl exec` on the pod
+kubectl exec -it ephemeral-demo -- sh
+
+# Output
+# error: Internal error occurred: error executing command in container: failed to exec in container: failed to start exec "8feb76799c2cb1e2db635d7e087df0e7b3504ffe6176dfbfc125e863b58953da": OCI runtime exec failed: exec failed: unable to start container process: exec: "sh": executable file not found in $PATH: unknown
+
+# Create ephemeral container to debug main container
+kubectl debug -it ephemeral-demo --image=busybox:1.28 --target=ephemeral-demo
+
+# It's possible to see all process being run on target container
+# Execute:
+$ ps
+
+# Output
+# PID   USER     TIME  COMMAND
+#     1 root      0:00 /pause
+#    14 root      0:00 sh
+#    20 root      0:00 ps
+
+```
+- It's possible to use `kubectl debug` to troubleshoot nodes as well:
+```bash
+kubectl debug node/k8s-worker1 -it --image=ubuntu
+
+# The host filesystem will be mapped to /host path
+ls /host
+
+# The container also share the same network namespace 
+apt update && apt install net-tools -y
+
+# List all network interfaces
+ifconfig
+```
+
+</details>
+
+## Troubleshoot cluster component failure
+Reference:
+- https://kubernetes.io/docs/tasks/debug/debug-cluster/
+<details>
 
 </details>

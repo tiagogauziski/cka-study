@@ -6,6 +6,7 @@
 1. [Manage container stdout & stderr logs](#manage-container-stdout--stderr-logs)
 1. [Troubleshoot application failure](#troubleshoot-application-failure)
 1. [Troubleshoot cluster component failure](#troubleshoot-cluster-component-failure)
+1. [Troubleshoot networking](#troubleshoot-networking)
 
 ## Evaluate cluster and node logging
 Reference: 
@@ -532,6 +533,52 @@ ifconfig
 ## Troubleshoot cluster component failure
 Reference:
 - https://kubernetes.io/docs/tasks/debug/debug-cluster/
+- https://kubernetes.io/docs/tasks/debug/debug-cluster/kubectl-node-debug/
+<details>
+
+### Understand health of the cluster
+As a starting point, we need to to check the status of all nodes
+```bash
+kubectl get nodes
+
+# Output
+# NAME          STATUS   ROLES           AGE   VERSION
+# k8s-control   Ready    control-plane   9d    v1.27.1
+# k8s-worker1   Ready    <none>          9d    v1.27.1
+# k8s-worker2   Ready    <none>          9d    v1.27.1
+
+# Get additional node details using describe
+kubectl describe node k8s-worker1
+```
+
+### Access cluster component logs
+To dig deeper into cluster components, you can access the machine via SSH and access the logs from Kubernetes cluster componentes:
+```bash
+# Get latest 50 logs from kubelet and containerd
+sudo journalctl -u kubelet -n 50
+sudo journalctl -u containerd -n 50
+
+# Control plane logs
+ls -l /var/log/pods/
+
+# Output
+# drwxr-xr-x 5 root root 4096 Apr 15 09:11 kube-flannel_kube-flannel-ds-6wtc5_2e433181-073b-4f20-87e5-de7130bf9af7
+# drwxr-xr-x 3 root root 4096 Apr 15 09:11 kube-system_coredns-5d78c9869d-5bd4h_68b893a5-8651-4094-b5d6-e805e527f822
+# drwxr-xr-x 3 root root 4096 Apr 15 09:11 kube-system_coredns-5d78c9869d-zbnqh_09b8f2d0-6e3b-46a4-af9e-8e2069f58f3e
+# drwxr-xr-x 3 root root 4096 Apr 15 09:09 kube-system_etcd-k8s-control_e77889d75ec8be65235fe5a966d3f808
+# drwxr-xr-x 3 root root 4096 Apr 15 09:09 kube-system_kube-apiserver-k8s-control_7aa16eec6102a48d7927dc3c247d32aa
+# drwxr-xr-x 3 root root 4096 Apr 15 09:09 kube-system_kube-controller-manager-k8s-control_bacb67c97f1502d0c75dee43efc16ff1
+# drwxr-xr-x 3 root root 4096 Apr 15 09:09 kube-system_kube-proxy-j9r2z_845821be-e5d4-407c-9abd-c2d467e72e05
+# drwxr-xr-x 3 root root 4096 Apr 15 09:09 kube-system_kube-scheduler-k8s-control_bac5d5a4d789a9b52d73203b94687c4a
+
+# Get latest logs from etcd pod
+sudo tail -10 /var/log/pods/kube-system_etcd-k8s-control_e77889d75ec8be65235fe5a966d3f808/etcd/0.log
+```
+
+</details>
+
+## Troubleshoot networking
+Reference:
 <details>
 
 </details>

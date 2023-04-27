@@ -579,6 +579,118 @@ sudo tail -10 /var/log/pods/kube-system_etcd-k8s-control_e77889d75ec8be65235fe5a
 
 ## Troubleshoot networking
 Reference:
+- https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/
 <details>
+
+To troubleshoot services, let's follow up the [troubleshooting services guide](https://kubernetes.io/docs/tasks/debug/debug-application/debug-service/) mentioned on the reference section.
+  
+As a starting point, let's create a deployment with some Pods to use as example.
+```bash
+# Create deployment called `hostnames`
+kubectl create deployment hostnames --image=registry.k8s.io/serve_hostname
+
+# Let's scale it up to 3 replicas
+kubectl scale deployment hostnames --replicas=3
+
+# Get the IP addresses from the running Pods
+kubectl get pods -l app=hostnames -o wide
+
+# Output
+# NAME                        READY   STATUS    RESTARTS   AGE     IP             NODE          NOMINATED NODE   READINESS GATES
+# hostnames-fc9b89785-7lcmc   1/1     Running   0          9m50s   10.244.1.83    k8s-worker1   <none>           <none>
+# hostnames-fc9b89785-xgljx   1/1     Running   0          9m50s   10.244.2.168   k8s-worker2   <none>           <none>
+# hostnames-fc9b89785-zz6w2   1/1     Running   0          9m55s   10.244.1.82    k8s-worker1   <none>           <none>
+
+# The container used on this example exposes port 9376
+for ep in 10.244.1.83:9376 10.244.2.168:9376 10.244.1.82:9376; do
+    wget -qO- $ep
+done
+```
+### How to check if the a service exists
+```bash
+# Load a debug container
+kubectl run -i --tty busybox --image=busybox --restart=Never --rm -- sh
+
+# Check to see if we can query the service
+wget -O- hostnames
+# wget: bad address 'hostnames'
+
+# Check DNS lookup
+nslookup hostnames
+
+# Output:
+# Server:         10.96.0.10
+# Address:        10.96.0.10:53
+# ** server can't find hostnames.default.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.default.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.cluster.local: NXDOMAIN
+# ** server can't find hostnames.cluster.local: NXDOMAIN
+# ** server can't find hostnames.home: NXDOMAIN
+# ** server can't find hostnames.home: NXDOMAIN
+
+# Check to see if service has been created
+kubectl get svc hostnames
+
+# Output:
+# Error from server (NotFound): services "hostnames" not found
+
+# If does not exist, let's create it then
+kubectl expose deployment hostnames --port=80 --target-port=9376
+
+# Check the service again
+kubectl get svc hostnames
+
+# Output
+# NAME        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+# hostnames   ClusterIP   10.98.111.229   <none>        80/TCP    49s
+
+# From within the busybox container, try resolving the DNS entry again
+nslookup hostnames
+
+# Output
+# Server:         10.96.0.10
+# Address:        10.96.0.10:53
+# Name:   hostnames.default.svc.cluster.local
+# Address: 10.98.111.229
+# ** server can't find hostnames.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.svc.cluster.local: NXDOMAIN
+# ** server can't find hostnames.cluster.local: NXDOMAIN
+# ** server can't find hostnames.cluster.local: NXDOMAIN
+# ** server can't find hostnames.home: NXDOMAIN
+# ** server can't find hostnames.home: NXDOMAIN
+
+# Check see if calling the service would reach all pods
+for i in $(seq 1 3); do 
+    wget -qO- hostnames:80
+done
+
+# Output
+# hostnames-fc9b89785-xgljx
+# hostnames-fc9b89785-7lcmc
+# hostnames-fc9b89785-zz6w2
+```
+
+### How to check if `Service` has endpoints
+To confirm that the service is scheduling to each Pod in the deployment, we need to check if the Service contains all endpoints (each Pod is an endpoint behind the service)
+```bash
+# Let's check all Pods IP addresses again
+kubectl get pods -l app=hostnames -o wide
+
+# Output
+# NAME                        READY   STATUS    RESTARTS   AGE   IP             NODE          NOMINATED NODE   READINESS GATES
+# hostnames-fc9b89785-7lcmc   1/1     Running   0          84m   10.244.1.83    k8s-worker1   <none>           <none>
+# hostnames-fc9b89785-xgljx   1/1     Running   0          84m   10.244.2.168   k8s-worker2   <none>           <none>
+# hostnames-fc9b89785-zz6w2   1/1     Running   0          84m   10.244.1.82    k8s-worker1   <none>           <none>
+
+kubectl get endpoints hostnames
+
+# The list of endpoints should match the list of Pod's IP
+# Output
+# NAME        ENDPOINTS                                             AGE
+# hostnames   10.244.1.82:9376,10.244.1.83:9376,10.244.2.168:9376   27m
+```
+
 
 </details>

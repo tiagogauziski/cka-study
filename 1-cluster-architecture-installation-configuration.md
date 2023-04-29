@@ -8,6 +8,56 @@
 1. [Provision underlying infrastructure to deploy a Kubernetes cluster](#provision-underlying-infrastructure-to-deploy-a-kubernetes-cluster)
 1. [Implement etcd backup and restore](#implement-etcd-backup-and-restore)
 
+## Bonus: Get started with kubectl config
+Reference: 
+- https://kubernetes.io/docs/reference/access-authn-authz/authentication/
+
+<details>
+
+When interacting with Kubernetes clusters using `kubectl` tool, it is required to configure it first with information about the who is accessing the cluster (`kubectl config get-credentials`) and where is the cluster hosted (`kubectl config get-clusters`). Binding these two pieces for information together and you have a context (`kubectl config get-context`).
+
+When provisioning a cluster with `kubeadm`, it generates a `.kube` file that contains a admin user, the recently created cluster and a default context. 
+
+The following commands assumes there is a basic cluster running on the instance. The following commands creates a new user certificate and key to be used on a kubectl context
+```bash
+# Create a key
+openssl genrsa -out tiago.key 2048
+
+# Create user CSR
+# Kubernetes uses what is inside Organization as user group information
+# In this case, the user tiago belongs to "administrators" and "users" groups
+openssl req -new -key tiago.key -out tiago.csr -subj "/CN=tiago/O=administrators/O=users"
+
+# Approve the CSR
+sudo openssl x509 -req -in tiago.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out tiago.crt -days 500
+
+# Create kubectl credential
+kubectl config set-credentials tiago --client-certificate=/home/tiago/tiago.crt --client-key=/home/iago/tiago.key
+# Create kubectl context using the new user and the existing cluster
+kubectl config set-context tiago@kubernetes --cluster=kubernetes --user=tiago
+
+# Let's all available contexts
+kubectl config get-contexts
+
+# Output
+# CURRENT   NAME                          CLUSTER      AUTHINFO           NAMESPACE
+# *         kubernetes-admin@kubernetes   kubernetes   kubernetes-admin
+#           tiago@kubernetes              kubernetes   tiago
+
+# Let's switch to the recently created context
+kubectl config use-context tiago@kubernetes
+
+# Try listing all pods (it will fail, as the user does not have any permissions assigned)
+kubectl get pods
+
+# Output
+# Error from server (Forbidden): pods is forbidden: User "tiago" cannot list resource "pods" in API group "" in the namespace "default"
+```
+
+Once the new user and the contexts are created, we can proceed to the next section in order to assign permissions.
+
+</details>
+
 ## Manage role based access control (RBAC)
 Reference: 
 - https://kubernetes.io/docs/reference/access-authn-authz/rbac/
@@ -16,6 +66,7 @@ Reference:
 
 <details>
 <summary>Solution</summary>
+
 Role-based access (RBAC) is a method of regulating access to computer or network resources based on the roles of individual users within your organization.
 
 It allows fine grain access permissions to users, groups or service accounts within your cluster.

@@ -1,6 +1,7 @@
 # Cluster Architecture, Installation & Configuration (25%)
 
 ## Table of contents
+1. [Bonus: Get started with kubectl config](#bonus-get-started-with-kubectl-config)
 1. [Manage role based access control (RBAC)](#manage-role-based-access-control-rbac)
 1. [Bonus: How to trobleshoot permission problems](#bonus-how-to-trobleshoot-permission-problems)
 1. [Use Kubeadm to install a basic cluster](#use-kubeadm-to-install-a-basic-cluster)
@@ -72,6 +73,8 @@ Role-based access (RBAC) is a method of regulating access to computer or network
 It allows fine grain access permissions to users, groups or service accounts within your cluster.
 
 `Role` and `ClusterRole` contains rules that represents a set of permissions (e.g. get a list of pods of a namamespace, or get a list all the nodes of a cluster)
+- If you want to define a role within a specific namespace, use `Role`. (Cannot be reused on another namespace)
+- If you want to define a role and reuse it for multiple namespaces, or for a cluster-scoped resource, use `ClusterRole`.
 
 `RoleBinding` and `ClusterRoleBinding` associates permissions defined in a Role/ClusterRole to a list of subjects (users, groups or service accounts).
 

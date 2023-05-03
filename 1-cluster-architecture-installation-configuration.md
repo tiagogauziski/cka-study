@@ -59,6 +59,14 @@ Once the new user and the contexts are created, we can proceed to the next secti
 
 </details>
 
+### Summary
+```bash
+kubectl config set-credentials tiago --client-certificate=/home/tiago/tiago.crt --client-key=/home/iago/tiago.key
+kubectl config set-context tiago@kubernetes --cluster=kubernetes --user=tiago
+kubectl config get-contexts
+kubectl config use-context tiago@kubernetes
+```
+
 ## Manage role based access control (RBAC)
 Reference: 
 - https://kubernetes.io/docs/reference/access-authn-authz/rbac/
@@ -116,7 +124,7 @@ roleRef:
 ```
 
 1. It's also possible to execute the same command above in an imperative way
-```
+```bash
 kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
 
 kubectl create rolebinding read-pods --user=tiago --role=pod-reader --namespace=development
@@ -151,13 +159,21 @@ roleRef:
 ```
 
 1. It's also possible to execute the same command above in an imperative way
-```
+```bash
 kubectl create clusterrole nodes-reader --verb=get --verb=list --verb=watch --resource=nodes
 
 kubectl create clusterrolebinding nodes-reader --user=tiago --clusterrole=nodes-reader
 ```
 
 </details>
+
+### Summary
+```bash
+kubectl create role pod-reader --verb=get --verb=list --verb=watch --resource=pods
+kubectl create rolebinding read-pods --user=tiago --role=pod-reader --namespace=development
+kubectl create clusterrole nodes-reader --verb=get --verb=list --verb=watch --resource=nodes
+kubectl create clusterrolebinding nodes-reader --user=tiago --clusterrole=nodes-reader
+```
 
 ## Bonus: How to trobleshoot permission problems
 Reference: 
@@ -198,6 +214,14 @@ kubectl get pods --namespace development --as=john
 # Output: Error from server (Forbidden): pods is forbidden: User "john" cannot list resource "pods" in API group "" in the namespace "development"
 ```
 </details>
+
+### Summary
+```bash
+# Cluster administrators only
+kubectl auth can-i list pods --as=tiago --namespace=development
+# Uses the current user
+kubectl auth can-i list pods --namespace=development
+```
 
 ## Use Kubeadm to install a basic cluster
 Reference:
@@ -272,10 +296,10 @@ sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl
 
 # Download the Google Cloud public signing key
-sudo curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+sudo curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
 
 # Add the Kubernetes apt repository
-echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
 
 # Update apt package index, install kubelet, kubeadm and kubectl, and pin their version:
 sudo apt-get update
@@ -311,6 +335,47 @@ kubeadm token create --print-join-command
 kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>
 ```
 </details>
+
+### Summary
+```bash
+# control-plane/worker - install containerd
+sudo swapoff -A
+sudo sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab # comment swap entry
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+sudo modprobe overlay
+sudo modprobe br_netfilter
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sudo sysctl --system
+sudo apt-get update && sudo apt-get install -y containerd
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+
+# control-plane/worker - install k8s components
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl
+sudo curl -fsSLo /etc/apt/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+
+# control-plane only
+sudo kubeadm init --pod-network-cidr 10.244.0.0/16
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# worker only
+kubeadm join <control-plane-host>:<control-plane-port> --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+```
 
 ## Manage a highly-available Kubernetes cluster
 Reference:
